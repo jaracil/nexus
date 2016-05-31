@@ -84,7 +84,11 @@ func dbBootstrap() error {
 		log.Println("Creating root user")
 		ud := UserData{User: "root", Salt: safeId(16), Tags: map[string]map[string]interface{}{".": {"@admin": true}}}
 		ud.Pass, err = HashPass("root", ud.Salt)
-		r.Table("users").Insert(&ud).RunWrite(db)
+		_, err = r.Table("users").Insert(&ud).RunWrite(db)
+		if err != nil {
+			return err
+		}
+
 	}
 	if !inStrSlice(tablelist, "nodes") {
 		log.Println("Creating nodes table")
@@ -169,29 +173,38 @@ func dbBootstrap() error {
 	return nil
 }
 
-func dbClean(prefix string) {
+func dbClean(prefix string) (err error) {
 	// Delete all tasks from this prefix
-	r.Table("tasks").
+	_, err = r.Table("tasks").
 		Between(prefix, prefix+"\uffff").
 		Delete().
 		RunWrite(db, r.RunOpts{Durability: "soft"})
+	if err != nil {
+		return
+	}
 	// Recover all tasks whose target session is this prefix
-	r.Table("tasks").
+	_, err = r.Table("tasks").
 		Between(prefix, prefix+"\uffff", r.BetweenOpts{Index: "tses"}).
 		Update(r.Branch(r.Row.Field("stat").Eq("working"),
 			map[string]interface{}{"stat": "waiting", "tses": nil},
 			map[string]interface{}{}),
 			r.UpdateOpts{ReturnChanges: false}).
 		RunWrite(db, r.RunOpts{Durability: "soft"})
+	if err != nil {
+		return
+	}
 	// Delete all pipes from this prefix
-	r.Table("pipes").
+	_, err = r.Table("pipes").
 		Between(prefix, prefix+"\uffff").
 		Delete().
 		RunWrite(db, r.RunOpts{Durability: "soft"})
+	if err != nil {
+		return
+	}
 	// Delete all locks from this prefix
-	r.Table("locks").
+	_, err = r.Table("locks").
 		Between(prefix, prefix+"\uffff", r.BetweenOpts{Index: "owner"}).
 		Delete().
 		RunWrite(db, r.RunOpts{Durability: "soft"})
-
+	return
 }

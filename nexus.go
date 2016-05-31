@@ -51,6 +51,7 @@ func main() {
 	}
 	defer db.Close()
 
+	go nodeTrack()
 	go taskTrack()
 	go pipeTrack()
 	go taskPurge()
@@ -59,6 +60,6 @@ func main() {
 
 	log.Printf("Start Daemon, Node ID:%s\r\n", nodeId)
 	<-mainContext.Done()
-	dbClean(nodeId)
+	cleanNode(nodeId)
 	log.Printf("Stop Daemon, Node ID:%s\r\n", nodeId)
 }

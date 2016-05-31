@@ -38,18 +38,20 @@ func taskPurge() {
 	for {
 		select {
 		case <-tick.C:
-			r.Table("tasks").
-				Between(r.MinVal, r.Now(), r.BetweenOpts{Index: "deadLine"}).
-				Update(r.Branch(r.Row.Field("stat").Ne("done"),
-					map[string]interface{}{"stat": "done", "errCode": ErrTimeout, "errStr": ErrStr[ErrTimeout], "deadLine": r.Now().Add(600)},
-					map[string]interface{}{}),
-					r.UpdateOpts{ReturnChanges: false}).
-				RunWrite(db, r.RunOpts{Durability: "soft"})
-			r.Table("tasks").
-				Between(r.MinVal, r.Now(), r.BetweenOpts{Index: "deadLine"}).
-				Filter(r.Row.Field("stat").Eq("done")).
-				Delete().
-				RunWrite(db, r.RunOpts{Durability: "soft"})
+			if isMasterNode() {
+				r.Table("tasks").
+					Between(r.MinVal, r.Now(), r.BetweenOpts{Index: "deadLine"}).
+					Update(r.Branch(r.Row.Field("stat").Ne("done"),
+						map[string]interface{}{"stat": "done", "errCode": ErrTimeout, "errStr": ErrStr[ErrTimeout], "deadLine": r.Now().Add(600)},
+						map[string]interface{}{}),
+						r.UpdateOpts{ReturnChanges: false}).
+					RunWrite(db, r.RunOpts{Durability: "soft"})
+				r.Table("tasks").
+					Between(r.MinVal, r.Now(), r.BetweenOpts{Index: "deadLine"}).
+					Filter(r.Row.Field("stat").Eq("done")).
+					Delete().
+					RunWrite(db, r.RunOpts{Durability: "soft"})
+			}
 		case <-mainContext.Done():
 			return
 		}
