@@ -93,7 +93,7 @@ func httpListener(u *url.URL) {
 
 	handler := http.Handler(&httpwsHandler{})
 
-	log.Println("Listening HTTP  at:", fmt.Sprintf("%s%s", u.Host, u.Path))
+	log.Println("Listening HTTP  at:", u.Host)
 	err := http.ListenAndServe(u.Host, handler)
 	if err != nil {
 		log.Println("HTTP listener error: " + err.Error())
@@ -105,13 +105,9 @@ func httpListener(u *url.URL) {
 func httpsListener(u *url.URL) {
 	defer exit("https listener goroutine error")
 
-	if u.Path == "" {
-		u.Path = "/"
-	}
-
 	handler := http.Handler(&httpwsHandler{})
 
-	log.Println("Listening HTTPS at:", fmt.Sprintf("%s%s", u.Host, u.Path))
+	log.Println("Listening HTTPS at:", u.Host)
 	err := http.ListenAndServeTLS(u.Host, opts.SSL.Cert, opts.SSL.Key, handler)
 	if err != nil {
 		log.Println("HTTPS listener error: " + err.Error())
