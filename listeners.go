@@ -14,10 +14,10 @@ func listen() {
 				go tcpListener(u)
 			case "ssl":
 				go sslListener(u)
-			case "ws":
-				go wsListener(u)
-			case "wss":
-				go wssListener(u)
+			case "http":
+				go httpListener(u)
+			case "https":
+				go httpsListener(u)
 
 			default:
 				log.Println("Unknown listener: ", u)

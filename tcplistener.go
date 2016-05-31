@@ -24,7 +24,7 @@ func tcpListener(u *url.URL) {
 		return
 	}
 
-	log.Println("Listening TCP at:", u.Host)
+	log.Println("Listening TCP   at:", u.Host)
 
 	for {
 		conn, err := listen.Accept()
@@ -61,7 +61,7 @@ func sslListener(u *url.URL) {
 		return
 	}
 
-	log.Println("Listening SSL at:", u.Host)
+	log.Println("Listening SSL   at:", u.Host)
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
