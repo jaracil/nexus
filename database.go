@@ -84,7 +84,11 @@ func dbBootstrap() error {
 		log.Println("Creating root user")
 		ud := UserData{User: "root", Salt: safeId(16), Tags: map[string]map[string]interface{}{".": {"@admin": true}}}
 		ud.Pass, err = HashPass("root", ud.Salt)
-		r.Table("users").Insert(&ud).RunWrite(db)
+		_, err = r.Table("users").Insert(&ud).RunWrite(db)
+		if err != nil {
+			return err
+		}
+
 	}
 	if !inStrSlice(tablelist, "nodes") {
 		log.Println("Creating nodes table")
