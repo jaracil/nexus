@@ -26,6 +26,7 @@ func httpws(res http.ResponseWriter, req *http.Request) {
 		if upgr == "websocket" {
 
 			// WebSocket
+
 			wsrv := &websocket.Server{}
 			wsrv.Handler = func(ws *websocket.Conn) {
 				log.Print("WebSocket connection from: ", req.RemoteAddr)
@@ -65,15 +66,17 @@ func httpws(res http.ResponseWriter, req *http.Request) {
 
 		nc := nxcore.NewNexusConn(A)
 		if _, err := nc.Login(user, pass); err == nil {
+
+			jsonres := &nxcore.JsonRpcRes{Jsonrpc: "2.0", Id: jsonreq.Id}
 			if r, e := nc.Exec(jsonreq.Method, jsonreq.Params); e == nil {
-				ret, _ := json.Marshal(r)
-				res.WriteHeader(200)
-				res.Write(ret)
+				jsonres.Result = r
 			} else {
-				ret, _ := json.Marshal(e)
-				res.WriteHeader(200)
-				res.Write(ret)
+				jsonres.Error = e.(*nxcore.JsonRpcErr)
 			}
+
+			ret, _ := json.Marshal(jsonres)
+			res.WriteHeader(200)
+			res.Write(ret)
 
 		} else {
 			res.WriteHeader(401)
@@ -89,6 +92,8 @@ func httpListener(u *url.URL) {
 	if u.Path == "" {
 		u.Path = "/"
 	}
+
+	http.HandleFunc(u.Path, httpws)
 
 	log.Println("Listening HTTP  at:", fmt.Sprintf("%s%s", u.Host, u.Path))
 	err := http.ListenAndServe(u.Host, nil)
