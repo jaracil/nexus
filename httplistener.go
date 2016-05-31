@@ -13,7 +13,9 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-func httpws(res http.ResponseWriter, req *http.Request) {
+type httpwsHandler struct{}
+
+func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	if req.TLS == nil {
 		log.Printf("[WARN] Unencrypted connection from %s!!\n", req.RemoteAddr)
@@ -89,14 +91,10 @@ func httpws(res http.ResponseWriter, req *http.Request) {
 func httpListener(u *url.URL) {
 	defer exit("http listener goroutine error")
 
-	if u.Path == "" {
-		u.Path = "/"
-	}
+	handler := http.Handler(&httpwsHandler{})
 
-	http.HandleFunc(u.Path, httpws)
-
-	log.Println("Listening HTTP  at:", fmt.Sprintf("%s%s", u.Host, u.Path))
-	err := http.ListenAndServe(u.Host, nil)
+	log.Println("Listening HTTP  at:", u.Host)
+	err := http.ListenAndServe(u.Host, handler)
 	if err != nil {
 		log.Println("HTTP listener error: " + err.Error())
 		mainCancel()
@@ -107,14 +105,10 @@ func httpListener(u *url.URL) {
 func httpsListener(u *url.URL) {
 	defer exit("https listener goroutine error")
 
-	if u.Path == "" {
-		u.Path = "/"
-	}
+	handler := http.Handler(&httpwsHandler{})
 
-	http.HandleFunc(u.Path, httpws)
-
-	log.Println("Listening HTTPS at:", fmt.Sprintf("%s%s", u.Host, u.Path))
-	err := http.ListenAndServeTLS(u.Host, opts.SSL.Cert, opts.SSL.Key, nil)
+	log.Println("Listening HTTPS at:", u.Host)
+	err := http.ListenAndServeTLS(u.Host, opts.SSL.Cert, opts.SSL.Key, handler)
 	if err != nil {
 		log.Println("HTTPS listener error: " + err.Error())
 		mainCancel()
