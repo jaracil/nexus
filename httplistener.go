@@ -1,10 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
+
+	"github.com/jaracil/nxcli/nxcore"
 
 	"golang.org/x/net/websocket"
 )
@@ -43,9 +47,39 @@ func httpws(res http.ResponseWriter, req *http.Request) {
 
 		// HTTP Bridge
 
-		log.Println("Bridge not implemented. Dropping connection")
-		res.WriteHeader(500)
-		res.Write([]byte("HTTP Bridge not implemented\n"))
+		user, pass, _ := req.BasicAuth()
+
+		body := make([]byte, 4096)
+		n, _ := req.Body.Read(body)
+		body = body[:n]
+		fmt.Printf("%s\n", body)
+		var jsonreq nxcore.JsonRpcReq
+		if err := json.Unmarshal(body[:n], &jsonreq); err != nil {
+			log.Println("Malformed JSON on HTTP bridge:", err)
+			return
+		}
+
+		A, B := net.Pipe()
+		ns := NewNexusConn(B)
+		go ns.handle()
+
+		nc := nxcore.NewNexusConn(A)
+		if _, err := nc.Login(user, pass); err == nil {
+			if r, e := nc.Exec(jsonreq.Method, jsonreq.Params); e == nil {
+				ret, _ := json.Marshal(r)
+				res.WriteHeader(200)
+				res.Write(ret)
+			} else {
+				ret, _ := json.Marshal(e)
+				res.WriteHeader(200)
+				res.Write(ret)
+			}
+
+		} else {
+			res.WriteHeader(401)
+		}
+		nc.Cancel()
+		ns.clean()
 	}
 }
 
