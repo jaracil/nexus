@@ -8,13 +8,13 @@ import (
 
 var opts struct {
 	Verbose   []bool         `short:"v" long:"verbose" description:"Show verbose debug information"`
-	Listeners []string       `short:"l" long:"listen"  description:"Listen on protocols like tcp://0.0.0.0:1717, ssl://1.2.3.4:1234, ws://127.0.0.1:80/ws" default:"tcp://0.0.0.0:1717"`
+	Listeners []string       `short:"l" long:"listen"  description:"Listen on (tcp|ssl|http|https)://addr:port" default:"tcp://0.0.0.0:1717"`
 	Rethink   RethinkOptions `group:"RethinkDB Options"`
 	SSL       SSLOptions     `group:"SSL Options"`
 }
 
 type RethinkOptions struct {
-	Host       string `short:"h" long:"host" description:"RethinkDB host[:port]" default:"localhost:28015"`
+	Host       string `short:"r" long:"rethinkdb" description:"RethinkDB host[:port]" default:"localhost:28015"`
 	Database   string `short:"d" long:"database" description:"RethinkDB database" default:"nexus"`
 	MaxIdle    int    `long:"maxidle" description:"Max RethinkDB idle connections" default:"50"`
 	MaxOpen    int    `long:"maxopen" description:"Max RethinkDB open connections" default:"200"`
