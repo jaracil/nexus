@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -8,8 +10,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/jaracil/nxcli/nxcore"
-
+	"github.com/jaracil/ei"
 	"golang.org/x/net/websocket"
 )
 
@@ -49,42 +50,49 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	} else {
 
 		// HTTP Bridge
-
-		user, pass, _ := req.BasicAuth()
-
-		body := make([]byte, 4096)
-		n, _ := req.Body.Read(body)
-		body = body[:n]
-		fmt.Printf("%s\n", body)
-		var jsonreq nxcore.JsonRpcReq
-		if err := json.Unmarshal(body[:n], &jsonreq); err != nil {
-			log.Println("Malformed JSON on HTTP bridge:", err)
+		netCli, netSrv := net.Pipe()
+		netCliBuf := bufio.NewReader(netCli)
+		ns := NewNexusConn(netSrv)
+		defer ns.clean()
+		defer netCli.Close()
+		go ns.handle()
+		if user, pass, loginData := req.BasicAuth(); loginData {
+			fmt.Fprintf(netCli, `{"jsonrpc":"2.0", "id":1, "method":"sys.login", "params":{"user":"%s", "pass":"%s"}}`, user, pass)
+			resSlice, _, err := netCliBuf.ReadLine()
+			if err != nil {
+				res.WriteHeader(500)
+				return
+			}
+			loginRes := ei.M{}
+			if err := json.Unmarshal(resSlice, &loginRes); err != nil {
+				res.WriteHeader(500)
+				return
+			}
+			if ei.N(loginRes).M("id").IntZ() != 1 {
+				res.WriteHeader(500)
+				return
+			}
+			if !ei.N(loginRes).M("result").M("ok").BoolZ() {
+				res.WriteHeader(200)
+				res.Write([]byte(`{"jsonrpc":"2.0","id":1,"error":{"code":-32010,"message":"Permission denied [login fail]"}}`))
+				return
+			}
+		}
+		body := &bytes.Buffer{}
+		if _, err := body.ReadFrom(req.Body); err != nil {
+			res.WriteHeader(500)
 			return
 		}
-
-		A, B := net.Pipe()
-		ns := NewNexusConn(B)
-		go ns.handle()
-
-		nc := nxcore.NewNexusConn(A)
-		if _, err := nc.Login(user, pass); err == nil {
-
-			jsonres := &nxcore.JsonRpcRes{Jsonrpc: "2.0", Id: jsonreq.Id}
-			if r, e := nc.Exec(jsonreq.Method, jsonreq.Params); e == nil {
-				jsonres.Result = r
-			} else {
-				jsonres.Error = e.(*nxcore.JsonRpcErr)
-			}
-
-			ret, _ := json.Marshal(jsonres)
-			res.WriteHeader(200)
-			res.Write(ret)
-
-		} else {
-			res.WriteHeader(401)
+		if _, err := body.WriteTo(netCli); err != nil {
+			res.WriteHeader(500)
+			return
 		}
-		nc.Cancel()
-		ns.clean()
+		if resSlice, _, err := netCliBuf.ReadLine(); err == nil {
+			res.WriteHeader(200)
+			res.Write([]byte(resSlice))
+		} else {
+			res.WriteHeader(500)
+		}
 	}
 }
 
