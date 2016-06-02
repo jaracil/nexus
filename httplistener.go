@@ -2,9 +2,9 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -78,12 +78,7 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 				return
 			}
 		}
-		body := &bytes.Buffer{}
-		if _, err := body.ReadFrom(req.Body); err != nil {
-			res.WriteHeader(500)
-			return
-		}
-		if _, err := body.WriteTo(netCli); err != nil {
+		if _, err := io.Copy(netCli, req.Body); err != nil {
 			res.WriteHeader(500)
 			return
 		}
