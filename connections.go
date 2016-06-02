@@ -46,6 +46,7 @@ type NexusConn struct {
 	context   context.Context
 	cancelFun context.CancelFunc
 	wdog      int64
+	closed    int32 //Atomic bool
 }
 
 func NewNexusConn(conn net.Conn) *NexusConn {
@@ -162,7 +163,7 @@ func (nc *NexusConn) handleReq(req *JsonRpcReq) {
 }
 
 func (nc *NexusConn) respWorker() {
-	defer nc.cancelFun()
+	defer nc.close()
 	trackCh, err := sesNotify.Register(nc.connId, make(chan interface{}, 1024))
 	if err != nil { // Duplicated session ???
 		return
@@ -194,7 +195,7 @@ func (nc *NexusConn) respWorker() {
 }
 
 func (nc *NexusConn) sendWorker() {
-	defer nc.cancelFun()
+	defer nc.close()
 	var null *int
 	for {
 		res, err := nc.pullRes()
@@ -232,7 +233,7 @@ func (nc *NexusConn) sendWorker() {
 }
 
 func (nc *NexusConn) recvWorker() {
-	defer nc.cancelFun()
+	defer nc.close()
 	dec := json.NewDecoder(nc.connRx)
 	for dec.More() {
 		req := &JsonRpcReq{nc: nc}
@@ -260,7 +261,7 @@ func (nc *NexusConn) recvWorker() {
 }
 
 func (nc *NexusConn) watchdog() {
-	defer nc.cancelFun()
+	defer nc.close()
 	tick := time.NewTicker(time.Second * 10)
 	exit := false
 	for !exit {
@@ -281,17 +282,19 @@ func (nc *NexusConn) watchdog() {
 	tick.Stop()
 }
 
-func (nc *NexusConn) clean() {
-	nc.cancelFun()
-	nc.conn.Close()
-	if mainContext.Err() == nil {
-		log.Printf("Clean %s session\r\n", nc.connId)
-		dbClean(nc.connId)
+func (nc *NexusConn) close() {
+	if atomic.CompareAndSwapInt32(&nc.closed, 0, 1) {
+		nc.cancelFun()
+		nc.conn.Close()
+		if mainContext.Err() == nil {
+			log.Printf("Close %s session\r\n", nc.connId)
+			dbClean(nc.connId)
+		}
 	}
 }
 
 func (nc *NexusConn) handle() {
-	defer nc.clean()
+	defer nc.close()
 	go nc.respWorker()
 	go nc.sendWorker()
 	go nc.recvWorker()

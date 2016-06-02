@@ -53,7 +53,7 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		netCli, netSrv := net.Pipe()
 		netCliBuf := bufio.NewReader(netCli)
 		ns := NewNexusConn(netSrv)
-		defer ns.clean()
+		defer ns.close()
 		defer netCli.Close()
 		go ns.handle()
 		if user, pass, loginData := req.BasicAuth(); loginData {
