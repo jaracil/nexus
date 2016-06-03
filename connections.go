@@ -306,7 +306,7 @@ func (nc *NexusConn) handle() {
 			break
 		}
 		log.Printf("Recibida instruccion jsonrpc: %+v", req)
-		if req.Jsonrpc != "2.0" || req.Method == "" {
+		if (req.Jsonrpc != "2.0" && req.Jsonrpc != "") || req.Method == "" { //"jsonrpc":"2.0" is optional
 			req.Error(ErrInvalidRequest, "", nil)
 			continue
 		}
