@@ -73,6 +73,7 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 				return
 			}
 			if !ei.N(loginRes).M("result").M("ok").BoolZ() {
+				res.Header().Set("Content-Type", "application/json")
 				res.WriteHeader(http.StatusOK)
 				res.Write([]byte(`{"jsonrpc":"2.0","id":1,"error":{"code":-32010,"message":"Permission denied [login fail]"}}`))
 				return
@@ -83,6 +84,7 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 		if resSlice, _, err := netCliBuf.ReadLine(); err == nil {
+			res.Header().Set("Content-Type", "application/json")
 			res.WriteHeader(http.StatusOK)
 			res.Write([]byte(resSlice))
 		} else {
