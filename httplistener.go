@@ -44,7 +44,7 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 		} else {
 			log.Println("Connection dropped for requesting an upgrade to an unsupported protocol:", upgr)
-			res.WriteHeader(400)
+			res.WriteHeader(http.StatusBadRequest)
 		}
 
 	} else {
@@ -60,33 +60,33 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 			fmt.Fprintf(netCli, `{"jsonrpc":"2.0", "id":1, "method":"sys.login", "params":{"user":"%s", "pass":"%s"}}`, user, pass)
 			resSlice, _, err := netCliBuf.ReadLine()
 			if err != nil {
-				res.WriteHeader(500)
+				res.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			loginRes := ei.M{}
 			if err := json.Unmarshal(resSlice, &loginRes); err != nil {
-				res.WriteHeader(500)
+				res.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			if ei.N(loginRes).M("id").IntZ() != 1 {
-				res.WriteHeader(500)
+				res.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			if !ei.N(loginRes).M("result").M("ok").BoolZ() {
-				res.WriteHeader(200)
+				res.WriteHeader(http.StatusOK)
 				res.Write([]byte(`{"jsonrpc":"2.0","id":1,"error":{"code":-32010,"message":"Permission denied [login fail]"}}`))
 				return
 			}
 		}
 		if _, err := io.Copy(netCli, req.Body); err != nil {
-			res.WriteHeader(500)
+			res.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		if resSlice, _, err := netCliBuf.ReadLine(); err == nil {
-			res.WriteHeader(200)
+			res.WriteHeader(http.StatusOK)
 			res.Write([]byte(resSlice))
 		} else {
-			res.WriteHeader(500)
+			res.WriteHeader(http.StatusInternalServerError)
 		}
 	}
 }
