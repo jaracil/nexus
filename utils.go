@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
-	"net/http"
 	"strings"
 
 	"golang.org/x/crypto/scrypt"
