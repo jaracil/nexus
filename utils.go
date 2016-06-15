@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"net/http"
 	"strings"
 
 	"golang.org/x/crypto/scrypt"
@@ -12,6 +13,18 @@ import (
 func inStrSlice(slice []string, str string) bool {
 	for _, s := range slice {
 		if s == str {
+			return true
+		}
+	}
+	return false
+}
+
+func headerContains(header []string, str string) bool {
+	if header == nil {
+		return false
+	}
+	for _, s := range header {
+		if strings.Contains(s, str) {
 			return true
 		}
 	}

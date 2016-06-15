@@ -22,11 +22,8 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		log.Printf("[WARN] Unencrypted connection from %s!!\n", req.RemoteAddr)
 	}
 
-	hcon := req.Header.Get("Connection")
-	upgr := req.Header.Get("Upgrade")
-
-	if hcon == "Upgrade" {
-		if upgr == "websocket" {
+	if headerContains(req.Header["Connection"], "Upgrade") {
+		if headerContains(req.Header["Upgrade"], "websocket") {
 
 			// WebSocket
 
@@ -43,7 +40,7 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 			wsrv.ServeHTTP(res, req)
 
 		} else {
-			log.Println("Connection dropped for requesting an upgrade to an unsupported protocol:", upgr)
+			log.Printf("Connection dropped for requesting an upgrade to an unsupported protocol: %v\n", req.Header["Upgrade"])
 			res.WriteHeader(http.StatusBadRequest)
 		}
 
