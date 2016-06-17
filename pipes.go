@@ -113,7 +113,7 @@ func (nc *NexusConn) handlePipeReq(req *JsonRpcReq) {
 		msg := ei.N(req.Params).M("msg").RawZ()
 		res, err := r.Table("pipes").
 			Get(pipeid).
-			Update(map[string]interface{}{"msg": msg, "count": r.Row.Field("count").Add(1), "ismsg": true}).
+			Update(map[string]interface{}{"msg": r.Literal(msg), "count": r.Row.Field("count").Add(1), "ismsg": true}).
 			RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
