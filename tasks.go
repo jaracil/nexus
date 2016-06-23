@@ -13,6 +13,7 @@ type Task struct {
 	Id           string      `gorethink:"id"`
 	Stat         string      `gorethink:"stat"`
 	Path         string      `gorethink:"path"`
+	Prio         int         `gorethink:"prio"`
 	Method       string      `gorethink:"method"`
 	Params       interface{} `gorethink:"params"`
 	LocalId      interface{} `gorethink:"localId"`
@@ -42,8 +43,8 @@ func taskPurge() {
 				r.Table("tasks").
 					Between(r.MinVal, r.Now(), r.BetweenOpts{Index: "deadLine"}).
 					Update(r.Branch(r.Row.Field("stat").Ne("done"),
-						map[string]interface{}{"stat": "done", "errCode": ErrTimeout, "errStr": ErrStr[ErrTimeout], "deadLine": r.Now().Add(600)},
-						map[string]interface{}{}),
+						ei.M{"stat": "done", "errCode": ErrTimeout, "errStr": ErrStr[ErrTimeout], "deadLine": r.Now().Add(600)},
+						ei.M{}),
 						r.UpdateOpts{ReturnChanges: false}).
 					RunWrite(db, r.RunOpts{Durability: "soft"})
 				r.Table("tasks").
@@ -65,7 +66,7 @@ func taskTrack() {
 			Between(nodeId, nodeId+"\uffff").
 			Changes(r.ChangesOpts{IncludeInitial: true, Squash: false}).
 			Filter(r.Row.Field("new_val").Ne(nil)).
-			Pluck(map[string]interface{}{"new_val": []string{"id", "stat", "localId", "path", "method", "result", "errCode", "errStr", "errObj"}}).
+			Pluck(ei.M{"new_val": []string{"id", "stat", "localId", "path", "method", "result", "errCode", "errStr", "errObj"}}).
 			Run(db)
 		if err != nil {
 			log.Printf("Error opening taskTrack iterator:%s\n", err.Error())
@@ -105,11 +106,12 @@ func taskPull(task *Task) bool {
 	}
 	for {
 		wres, err := r.Table("tasks").
-			GetAllByIndex("stat_path", []interface{}{"waiting", prefix}).
-			Sample(1).
+			OrderBy(r.OrderByOpts{Index: "pspc"}).
+			Between(ei.S{prefix, "waiting", r.MinVal, r.MinVal}, ei.S{prefix, "waiting", r.MaxVal, r.MaxVal}, r.BetweenOpts{RightBound: "closed", Index: "pspc"}).
+			Limit(1).
 			Update(r.Branch(r.Row.Field("stat").Eq("waiting"),
-				map[string]interface{}{"stat": "working", "tses": task.Id[0:16]},
-				map[string]interface{}{}),
+				ei.M{"stat": "working", "tses": task.Id[0:16]},
+				ei.M{}),
 				r.UpdateOpts{ReturnChanges: true}).
 			RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
@@ -117,7 +119,7 @@ func taskPull(task *Task) bool {
 		}
 		if wres.Replaced > 0 {
 			newTask := ei.N(wres.Changes[0].NewValue)
-			result := make(map[string]interface{})
+			result := make(ei.M)
 			result["taskid"] = newTask.M("id").StringZ()
 			result["path"] = newTask.M("path").StringZ()
 			result["method"] = newTask.M("method").StringZ()
@@ -126,20 +128,19 @@ func taskPull(task *Task) bool {
 			pres, err := r.Table("tasks").
 				Get(task.Id).
 				Update(r.Branch(r.Row.Field("stat").Eq("working"),
-					map[string]interface{}{"stat": "done", "result": result, "deadLine": r.Now().Add(600)},
-					map[string]interface{}{})).
+					ei.M{"stat": "done", "result": result, "deadLine": r.Now().Add(600)},
+					ei.M{})).
 				RunWrite(db, r.RunOpts{Durability: "soft"})
 			if err != nil || pres.Replaced != 1 {
 				r.Table("tasks").
 					Get(result["taskid"]).
-					Update(map[string]interface{}{"stat": "waiting"}).
+					Update(ei.M{"stat": "waiting"}).
 					RunWrite(db, r.RunOpts{Durability: "soft"})
 				break
 			}
 			return true
 		}
 		if wres.Unchanged > 0 {
-			println("Collision!!!!")
 			continue
 		}
 		break
@@ -147,8 +148,8 @@ func taskPull(task *Task) bool {
 	r.Table("tasks").
 		Get(task.Id).
 		Update(r.Branch(r.Row.Field("stat").Eq("working"),
-			map[string]interface{}{"stat": "waiting"},
-			map[string]interface{}{})).
+			ei.M{"stat": "waiting"},
+			ei.M{})).
 		RunWrite(db, r.RunOpts{Durability: "soft"})
 	return false
 }
@@ -156,11 +157,11 @@ func taskPull(task *Task) bool {
 func taskWakeup(task *Task) bool {
 	for {
 		wres, err := r.Table("tasks").
-			GetAllByIndex("stat_path", []interface{}{"waiting", "@pull." + task.Path}).
+			Between(ei.S{"@pull." + task.Path, "waiting", r.MinVal, r.MinVal}, ei.S{"@pull." + task.Path, "waiting", r.MaxVal, r.MaxVal}, r.BetweenOpts{RightBound: "closed", Index: "pspc"}).
 			Sample(1).
 			Update(r.Branch(r.Row.Field("stat").Eq("waiting"),
-				map[string]interface{}{"stat": "working"},
-				map[string]interface{}{})).
+				ei.M{"stat": "working"},
+				ei.M{})).
 			RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
 			return false
@@ -194,6 +195,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidParams, "params", nil)
 			return
 		}
+		prio := -ei.N(req.Params).M("prio").IntZ()
 		tags := nc.getTags(method)
 		if !(ei.N(tags).M("@"+req.Method).BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
@@ -208,6 +210,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			Id:           nc.connId + safeId(10),
 			Stat:         "waiting",
 			Path:         path,
+			Prio:         prio,
 			Method:       met,
 			Params:       params,
 			Tags:         tags,
@@ -263,8 +266,8 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			Between(nc.connId, nc.connId+"\uffff").
 			Filter(r.Row.Field("localId").Eq(id)).
 			Update(r.Branch(r.Row.Field("stat").Ne("done"),
-				map[string]interface{}{"stat": "done", "errCode": ErrCancel, "errStr": ErrStr[ErrCancel], "deadLine": r.Now().Add(600)},
-				map[string]interface{}{}),
+				ei.M{"stat": "done", "errCode": ErrCancel, "errStr": ErrStr[ErrCancel], "deadLine": r.Now().Add(600)},
+				ei.M{}),
 				r.UpdateOpts{ReturnChanges: false}).
 			RunWrite(db, r.RunOpts{Durability: "soft"})
 
@@ -273,7 +276,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			return
 		}
 		if res.Replaced > 0 {
-			req.Result(map[string]interface{}{"ok": true})
+			req.Result(ei.M{"ok": true})
 		} else {
 			req.Error(ErrInvalidTask, "", nil)
 		}
@@ -283,14 +286,14 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		result := ei.N(req.Params).M("result").RawZ()
 		res, err := r.Table("tasks").
 			Get(taskid).
-			Update(map[string]interface{}{"stat": "done", "result": result, "deadLine": r.Now().Add(600)}).
+			Update(ei.M{"stat": "done", "result": result, "deadLine": r.Now().Add(600)}).
 			RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
 		}
 		if res.Replaced > 0 {
-			req.Result(map[string]interface{}{"ok": true})
+			req.Result(ei.M{"ok": true})
 		} else {
 			req.Error(ErrInvalidTask, "", nil)
 		}
@@ -302,14 +305,14 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		data := ei.N(req.Params).M("data").RawZ()
 		res, err := r.Table("tasks").
 			Get(taskid).
-			Update(map[string]interface{}{"stat": "done", "errCode": code, "errStr": message, "errObj": data, "deadLine": r.Now().Add(600)}).
+			Update(ei.M{"stat": "done", "errCode": code, "errStr": message, "errObj": data, "deadLine": r.Now().Add(600)}).
 			RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
 		}
 		if res.Replaced > 0 {
-			req.Result(map[string]interface{}{"ok": true})
+			req.Result(ei.M{"ok": true})
 		} else {
 			req.Error(ErrInvalidTask, "", nil)
 		}

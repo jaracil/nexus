@@ -127,10 +127,10 @@ func dbBootstrap() error {
 	if err != nil {
 		return err
 	}
-	if !inStrSlice(tasksIndexlist, "stat_path") {
-		log.Println("Creating stat_path index on tasks table")
-		_, err := r.Table("tasks").IndexCreateFunc("stat_path", func(row r.Term) interface{} {
-			return ei.S{row.Field("stat"), row.Field("path")}
+	if !inStrSlice(tasksIndexlist, "pspc") {
+		log.Println("Creating pspc index on tasks table")
+		_, err := r.Table("tasks").IndexCreateFunc("pspc", func(row r.Term) interface{} {
+			return ei.S{row.Field("path"), row.Field("stat"), row.Field("prio"), row.Field("creationTime")}
 		}).RunWrite(db)
 		if err != nil {
 			return err

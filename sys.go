@@ -13,6 +13,13 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 	switch req.Method {
 	case "sys.ping":
 		req.Result("pong")
+	case "sys.watchdog":
+		wdt := ei.N(req.Params).Int64Z()
+		if wdt < 10 {
+			wdt = 10
+		}
+		atomic.StoreInt64(&nc.wdog, wdt)
+		req.Result(ei.M{"ok": true, "watchdog": wdt})
 	case "sys.login":
 		user, err := ei.N(req.Params).M("user").String()
 		if err != nil {
