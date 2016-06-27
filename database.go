@@ -177,6 +177,7 @@ func dbClean(prefix string) (err error) {
 	// Delete all tasks from this prefix
 	_, err = r.Table("tasks").
 		Between(prefix, prefix+"\uffff").
+		Filter(r.Row.Field("detach").Not()).
 		Delete().
 		RunWrite(db, r.RunOpts{Durability: "soft"})
 	if err != nil {

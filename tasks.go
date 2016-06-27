@@ -14,6 +14,7 @@ type Task struct {
 	Stat         string      `gorethink:"stat"`
 	Path         string      `gorethink:"path"`
 	Prio         int         `gorethink:"prio"`
+	Detach       bool        `gorethink:"detach"`
 	Method       string      `gorethink:"method"`
 	Params       interface{} `gorethink:"params"`
 	LocalId      interface{} `gorethink:"localId"`
@@ -66,7 +67,7 @@ func taskTrack() {
 			Between(nodeId, nodeId+"\uffff").
 			Changes(r.ChangesOpts{IncludeInitial: true, Squash: false}).
 			Filter(r.Row.Field("new_val").Ne(nil)).
-			Pluck(ei.M{"new_val": []string{"id", "stat", "localId", "path", "method", "result", "errCode", "errStr", "errObj"}}).
+			Pluck(ei.M{"new_val": []string{"id", "stat", "localId", "detach", "path", "method", "result", "errCode", "errStr", "errObj"}}).
 			Run(db)
 		if err != nil {
 			log.Printf("Error opening taskTrack iterator:%s\n", err.Error())
@@ -84,8 +85,10 @@ func taskTrack() {
 			task := tf.New
 			switch task.Stat {
 			case "done":
-				sesNotify.Notify(tf.New.Id[0:16], task)
-				go deleteTask(tf.New.Id)
+				if !task.Detach {
+					sesNotify.Notify(task.Id[0:16], task)
+				}
+				go deleteTask(task.Id)
 			case "working":
 				if strings.HasPrefix(task.Path, "@pull.") {
 					go taskPull(task)
@@ -196,6 +199,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			return
 		}
 		prio := -ei.N(req.Params).M("prio").IntZ()
+		detach := ei.N(req.Params).M("detach").BoolZ()
 		tags := nc.getTags(method)
 		if !(ei.N(tags).M("@"+req.Method).BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
@@ -211,6 +215,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			Stat:         "waiting",
 			Path:         path,
 			Prio:         prio,
+			Detach:       detach,
 			Method:       met,
 			Params:       params,
 			Tags:         tags,
@@ -222,6 +227,9 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
+		}
+		if detach {
+			req.Result(ei.M{"ok": true})
 		}
 	case "task.pull":
 		if req.Id == nil {
@@ -260,27 +268,6 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			return
 		}
 
-	case "task.cancel":
-		id := ei.N(req.Params).M("taskid").RawZ()
-		res, err := r.Table("tasks").
-			Between(nc.connId, nc.connId+"\uffff").
-			Filter(r.Row.Field("localId").Eq(id)).
-			Update(r.Branch(r.Row.Field("stat").Ne("done"),
-				ei.M{"stat": "done", "errCode": ErrCancel, "errStr": ErrStr[ErrCancel], "deadLine": r.Now().Add(600)},
-				ei.M{}),
-				r.UpdateOpts{ReturnChanges: false}).
-			RunWrite(db, r.RunOpts{Durability: "soft"})
-
-		if err != nil {
-			req.Error(ErrInternal, "", nil)
-			return
-		}
-		if res.Replaced > 0 {
-			req.Result(ei.M{"ok": true})
-		} else {
-			req.Error(ErrInvalidTask, "", nil)
-		}
-
 	case "task.result":
 		taskid := ei.N(req.Params).M("taskid").StringZ()
 		result := ei.N(req.Params).M("result").RawZ()
@@ -316,6 +303,44 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		} else {
 			req.Error(ErrInvalidTask, "", nil)
 		}
+
+	case "task.reject":
+		taskid := ei.N(req.Params).M("taskid").StringZ()
+		res, err := r.Table("tasks").
+			Get(taskid).
+			Update(ei.M{"stat": "waiting"}).
+			RunWrite(db, r.RunOpts{Durability: "soft"})
+		if err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+		if res.Replaced > 0 {
+			req.Result(ei.M{"ok": true})
+		} else {
+			req.Error(ErrInvalidTask, "", nil)
+		}
+
+	case "task.cancel":
+		id := ei.N(req.Params).M("id").RawZ()
+		res, err := r.Table("tasks").
+			Between(nc.connId, nc.connId+"\uffff").
+			Filter(r.Row.Field("localId").Eq(id)).
+			Update(r.Branch(r.Row.Field("stat").Ne("done"),
+				ei.M{"stat": "done", "errCode": ErrCancel, "errStr": ErrStr[ErrCancel], "deadLine": r.Now().Add(600)},
+				ei.M{}),
+				r.UpdateOpts{ReturnChanges: false}).
+			RunWrite(db, r.RunOpts{Durability: "soft"})
+
+		if err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+		if res.Replaced > 0 {
+			req.Result(ei.M{"ok": true})
+		} else {
+			req.Error(ErrInvalidTask, "", nil)
+		}
+
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
 	}
