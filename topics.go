@@ -1,24 +1,48 @@
 package main
 
 import (
+	"strings"
+
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
 )
 
-func (nc *NexusConn) handleChanReq(req *JsonRpcReq) {
+func topicList(s string) (res []interface{}) {
+	s = strings.Trim(s, ". ")
+	if s == "" {
+		return []interface{}{".", ".*"}
+	}
+	res = append(res, s)
+	chunks := strings.Split(s, ".")
+	for n := len(chunks); n >= 0; n-- {
+		res = append(res, strings.Join(chunks[0:n], ".")+".*")
+	}
+	return
+}
+
+func (nc *NexusConn) topicPublish(topic string, message interface{}) (int, error) {
+	msg := ei.M{"topic": topic, "msg": message}
+	res, err := r.Table("pipes").
+		GetAllByIndex("subs", topicList(topic)...).
+		Update(map[string]interface{}{"msg": r.Literal(msg), "count": r.Row.Field("count").Add(1), "ismsg": true}).
+		RunWrite(db, r.RunOpts{Durability: "soft"})
+	return res.Replaced, err
+}
+
+func (nc *NexusConn) handleTopicReq(req *JsonRpcReq) {
 	switch req.Method {
-	case "chan.sub":
+	case "topic.sub":
 		pipeid, err := ei.N(req.Params).M("pipeid").String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "pipeid", nil)
 			return
 		}
-		channel, err := ei.N(req.Params).M("chan").String()
+		topic, err := ei.N(req.Params).M("topic").String()
 		if err != nil {
-			req.Error(ErrInvalidParams, "chan", nil)
+			req.Error(ErrInvalidParams, "topic", nil)
 			return
 		}
-		tags := nc.getTags(channel)
+		tags := nc.getTags(topic)
 		if !(ei.N(tags).M("@"+req.Method).BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
@@ -26,7 +50,7 @@ func (nc *NexusConn) handleChanReq(req *JsonRpcReq) {
 		res, err := r.Table("pipes").
 			Get(pipeid).
 			Update(map[string]interface{}{
-				"subs":  r.Row.Field("subs").Default(ei.S{}).SetInsert(channel),
+				"subs":  r.Row.Field("subs").Default(ei.S{}).SetInsert(topic),
 				"ismsg": false,
 				"msg":   nil,
 			}).
@@ -40,18 +64,18 @@ func (nc *NexusConn) handleChanReq(req *JsonRpcReq) {
 			return
 		}
 		req.Result(map[string]interface{}{"ok": true})
-	case "chan.unsub":
+	case "topic.unsub":
 		pipeid, err := ei.N(req.Params).M("pipeid").String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "pipeid", nil)
 			return
 		}
-		channel, err := ei.N(req.Params).M("chan").String()
+		topic, err := ei.N(req.Params).M("topic").String()
 		if err != nil {
-			req.Error(ErrInvalidParams, "chan", nil)
+			req.Error(ErrInvalidParams, "topic", nil)
 			return
 		}
-		tags := nc.getTags(channel)
+		tags := nc.getTags(topic)
 		if !(ei.N(tags).M("@"+req.Method).BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
@@ -59,7 +83,7 @@ func (nc *NexusConn) handleChanReq(req *JsonRpcReq) {
 		res, err := r.Table("pipes").
 			Get(pipeid).
 			Update(map[string]interface{}{
-				"subs":  r.Row.Field("subs").Default(ei.S{}).Difference(ei.S{channel}),
+				"subs":  r.Row.Field("subs").Default(ei.S{}).Difference(ei.S{topic}),
 				"ismsg": false,
 				"msg":   nil,
 			}).
@@ -74,10 +98,10 @@ func (nc *NexusConn) handleChanReq(req *JsonRpcReq) {
 		}
 		req.Result(map[string]interface{}{"ok": true})
 
-	case "chan.pub":
-		channel, err := ei.N(req.Params).M("chan").String()
+	case "topic.pub":
+		topic, err := ei.N(req.Params).M("topic").String()
 		if err != nil {
-			req.Error(ErrInvalidParams, "chan", nil)
+			req.Error(ErrInvalidParams, "topic", nil)
 			return
 		}
 		msg, err := ei.N(req.Params).M("msg").Raw()
@@ -86,21 +110,18 @@ func (nc *NexusConn) handleChanReq(req *JsonRpcReq) {
 			return
 		}
 
-		tags := nc.getTags(channel)
+		tags := nc.getTags(topic)
 		if !(ei.N(tags).M("@"+req.Method).BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
 
-		res, err := r.Table("pipes").
-			GetAllByIndex("subs", channel).
-			Update(map[string]interface{}{"msg": r.Literal(msg), "count": r.Row.Field("count").Add(1), "ismsg": true}).
-			RunWrite(db, r.RunOpts{Durability: "soft"})
+		sent, err := nc.topicPublish(topic, msg)
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
 		}
-		req.Result(map[string]interface{}{"ok": true, "sent": res.Replaced})
+		req.Result(map[string]interface{}{"ok": true, "sent": sent})
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
 

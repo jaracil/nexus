@@ -151,8 +151,8 @@ func (nc *NexusConn) handleReq(req *JsonRpcReq) {
 		nc.handleTaskReq(req)
 	case strings.HasPrefix(req.Method, "pipe."):
 		nc.handlePipeReq(req)
-	case strings.HasPrefix(req.Method, "chan."):
-		nc.handleChanReq(req)
+	case strings.HasPrefix(req.Method, "topic."):
+		nc.handleTopicReq(req)
 	case strings.HasPrefix(req.Method, "user."):
 		nc.handleUserReq(req)
 	case strings.HasPrefix(req.Method, "sync."):
