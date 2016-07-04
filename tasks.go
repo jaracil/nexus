@@ -68,7 +68,7 @@ func taskTrack() {
 			Between(nodeId, nodeId+"\uffff").
 			Changes(r.ChangesOpts{IncludeInitial: true, Squash: false}).
 			Filter(r.Row.Field("new_val").Ne(nil)).
-			Pluck(ei.M{"new_val": []string{"id", "stat", "localId", "detach", "path", "method", "result", "errCode", "errStr", "errObj"}}).
+			Pluck(ei.M{"new_val": []string{"id", "stat", "localId", "detach", "user", "prio", "path", "method", "result", "errCode", "errStr", "errObj"}}).
 			Run(db)
 		if err != nil {
 			log.Printf("Error opening taskTrack iterator:%s\n", err.Error())
