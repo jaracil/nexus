@@ -12,6 +12,8 @@ type UserData struct {
 	Tags map[string]map[string]interface{} `gorethink:"tags,omitempty"`
 }
 
+var Nobody *UserData = &UserData{User: "nobody", Tags: map[string]map[string]interface{}{}}
+
 func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 	switch req.Method {
 	case "user.create":

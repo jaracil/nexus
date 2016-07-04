@@ -15,6 +15,7 @@ type Task struct {
 	Path         string      `gorethink:"path"`
 	Prio         int         `gorethink:"prio"`
 	Detach       bool        `gorethink:"detach"`
+	User         string      `gorethink:"user"`
 	Method       string      `gorethink:"method"`
 	Params       interface{} `gorethink:"params"`
 	LocalId      interface{} `gorethink:"localId"`
@@ -128,6 +129,9 @@ func taskPull(task *Task) bool {
 			result["method"] = newTask.M("method").StringZ()
 			result["params"] = newTask.M("params").RawZ()
 			result["tags"] = newTask.M("tags").MapStrZ()
+			result["prio"] = newTask.M("prio").IntZ()
+			result["detach"] = newTask.M("detach").BoolZ()
+			result["user"] = newTask.M("user").StringZ()
 			pres, err := r.Table("tasks").
 				Get(task.Id).
 				Update(r.Branch(r.Row.Field("stat").Eq("working"),
@@ -219,6 +223,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			Method:       met,
 			Params:       params,
 			Tags:         tags,
+			User:         nc.user.User,
 			LocalId:      req.Id,
 			CreationTime: r.Now(),
 			DeadLine:     r.Now().Add(timeout),

@@ -55,6 +55,7 @@ func NewNexusConn(conn net.Conn) *NexusConn {
 		connRx: smartio.NewSmartReader(conn),
 		connTx: smartio.NewSmartWriter(conn),
 		connId: nodeId + safeId(4),
+		user:   Nobody,
 		chRes:  make(chan *JsonRpcRes, 64),
 		chReq:  make(chan *JsonRpcReq, 64),
 		wdog:   90,
