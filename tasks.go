@@ -129,7 +129,7 @@ func taskPull(task *Task) bool {
 			result["method"] = newTask.M("method").StringZ()
 			result["params"] = newTask.M("params").RawZ()
 			result["tags"] = newTask.M("tags").MapStrZ()
-			result["prio"] = newTask.M("prio").IntZ()
+			result["prio"] = -newTask.M("prio").IntZ()
 			result["detach"] = newTask.M("detach").BoolZ()
 			result["user"] = newTask.M("user").StringZ()
 			pres, err := r.Table("tasks").
