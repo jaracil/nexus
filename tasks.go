@@ -14,6 +14,7 @@ type Task struct {
 	Stat         string      `gorethink:"stat"`
 	Path         string      `gorethink:"path"`
 	Prio         int         `gorethink:"prio"`
+	Ttl          int         `gorethink:"ttl"`
 	Detach       bool        `gorethink:"detach"`
 	User         string      `gorethink:"user"`
 	Method       string      `gorethink:"method"`
@@ -68,7 +69,7 @@ func taskTrack() {
 			Between(nodeId, nodeId+"\uffff").
 			Changes(r.ChangesOpts{IncludeInitial: true, Squash: false}).
 			Filter(r.Row.Field("new_val").Ne(nil)).
-			Pluck(ei.M{"new_val": []string{"id", "stat", "localId", "detach", "user", "prio", "path", "method", "result", "errCode", "errStr", "errObj"}}).
+			Pluck(ei.M{"new_val": []string{"id", "stat", "localId", "detach", "user", "prio", "ttl", "path", "method", "result", "errCode", "errStr", "errObj"}}).
 			Run(db)
 		if err != nil {
 			log.Printf("Error opening taskTrack iterator:%s\n", err.Error())
@@ -96,7 +97,11 @@ func taskTrack() {
 				}
 			case "waiting":
 				if !strings.HasPrefix(task.Path, "@pull.") {
-					go taskWakeup(task)
+					if task.Ttl <= 0 {
+						go taskExpireTtl(task.Id)
+					} else {
+						go taskWakeup(task)
+					}
 				}
 			}
 		}
@@ -188,6 +193,13 @@ func deleteTask(id string) {
 	r.Table("tasks").Get(id).Delete().RunWrite(db, r.RunOpts{Durability: "soft"})
 }
 
+func taskExpireTtl(taskid string) {
+	r.Table("tasks").
+		Get(taskid).
+		Update(ei.M{"stat": "done", "errCode": ErrTtlExpired, "errStr": ErrStr[ErrTtlExpired], "deadLine": r.Now().Add(600)}).
+		RunWrite(db, r.RunOpts{Durability: "soft"})
+}
+
 func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 	var null *int
 	switch req.Method {
@@ -203,6 +215,10 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			return
 		}
 		prio := -ei.N(req.Params).M("prio").IntZ()
+		ttl := ei.N(req.Params).M("ttl").IntZ()
+		if ttl <= 0 {
+			ttl = 5
+		}
 		detach := ei.N(req.Params).M("detach").BoolZ()
 		tags := nc.getTags(method)
 		if !(ei.N(tags).M("@"+req.Method).BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
@@ -219,6 +235,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			Stat:         "waiting",
 			Path:         path,
 			Prio:         prio,
+			Ttl:          ttl,
 			Detach:       detach,
 			Method:       met,
 			Params:       params,
@@ -313,7 +330,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		taskid := ei.N(req.Params).M("taskid").StringZ()
 		res, err := r.Table("tasks").
 			Get(taskid).
-			Update(ei.M{"stat": "waiting"}).
+			Update(ei.M{"stat": "waiting", "tses": nil, "ttl": r.Row.Field("ttl").Add(-1)}).
 			RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
