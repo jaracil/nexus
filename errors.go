@@ -13,6 +13,7 @@ const (
 	ErrInvalidUser      = -32004
 	ErrUserExists       = -32005
 	ErrPermissionDenied = -32010
+	ErrTtlExpired       = -32011
 )
 
 var ErrStr = map[int]string{
@@ -28,4 +29,5 @@ var ErrStr = map[int]string{
 	ErrInvalidUser:      "Invalid user",
 	ErrUserExists:       "User already exists",
 	ErrPermissionDenied: "Permission denied",
+	ErrTtlExpired:       "TTL expired",
 }

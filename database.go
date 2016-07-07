@@ -187,7 +187,7 @@ func dbClean(prefix string) (err error) {
 	_, err = r.Table("tasks").
 		Between(prefix, prefix+"\uffff", r.BetweenOpts{Index: "tses"}).
 		Update(r.Branch(r.Row.Field("stat").Eq("working"),
-			map[string]interface{}{"stat": "waiting", "tses": nil},
+			map[string]interface{}{"stat": "waiting", "tses": nil, "ttl": r.Row.Field("ttl").Add(-1)},
 			map[string]interface{}{}),
 			r.UpdateOpts{ReturnChanges: false}).
 		RunWrite(db, r.RunOpts{Durability: "soft"})
