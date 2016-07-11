@@ -1,9 +1,6 @@
 package main
 
-import (
-	"log"
-	"net/url"
-)
+import "net/url"
 
 func listen() {
 	for _, v := range opts.Listeners {
@@ -20,13 +17,13 @@ func listen() {
 				go httpsListener(u)
 
 			default:
-				log.Println("Unknown listener: ", u)
+				errln("Unknown listener: ", u)
 				mainCancel()
 				return
 			}
 
 		} else {
-			log.Println("Couldn't parse listener:", v)
+			errln("Couldn't parse listener:", v)
 			mainCancel()
 			return
 		}

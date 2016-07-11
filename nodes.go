@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"sync/atomic"
 	"time"
 
@@ -34,10 +33,10 @@ func nodeTrack() {
 	}
 	_, err := r.Table("nodes").Insert(ndata).RunWrite(db)
 	if err != nil {
-		log.Printf("Error, can't insert on nodes table [%s]", err.Error())
+		errf("Error, can't insert on nodes table [%s]", err.Error())
 		return
 	}
-	// WatchDog loop
+	// Watchdog loop
 	tick := time.NewTicker(time.Second * 3)
 	defer tick.Stop()
 	exit := false
@@ -49,18 +48,18 @@ func nodeTrack() {
 				Update(ei.M{"deadline": r.Now().Add(10)}, r.UpdateOpts{ReturnChanges: true}).
 				RunWrite(db)
 			if err != nil {
-				log.Printf("Error, can't update on nodes table [%s]", err.Error())
+				errf("Error, can't update on nodes table [%s]", err.Error())
 				exit = true
 				break
 			}
 			if res.Replaced == 0 {
-				log.Printf("Error, cero records updated on nodes table. Record deleted?")
+				errln("Error, zero records updated on nodes table. Deleted record?")
 				exit = true
 				break
 			}
 			newNodeData := ei.N(res.Changes[0].NewValue)
 			if newNodeData.M("kill").BoolZ() {
-				log.Printf("Ouch!, I'm killed")
+				errln("Ouch!, I've been killed")
 				exit = true
 				break
 			}
@@ -70,7 +69,7 @@ func nodeTrack() {
 				Filter(r.Row.Field("kill").Eq(false)).
 				Update(ei.M{"kill": true}).
 				RunWrite(db)
-			// Clean killed nodes after 10 sconds.
+			// Clean killed nodes after 10 seconds.
 			cur, err := r.Table("nodes").
 				Filter(r.Row.Field("deadline").Lt(r.Now().Add(-10))).
 				Filter(r.Row.Field("kill").Eq(true)).
@@ -82,7 +81,7 @@ func nodeTrack() {
 					for _, n := range nodesKilled {
 						id := ei.N(n).M("id").StringZ()
 						cleanNode(id)
-						log.Printf("Cleaning node [%s]", id)
+						sysf("Cleaning node [%s]", id)
 					}
 				}
 			}
@@ -94,12 +93,12 @@ func nodeTrack() {
 				if err == nil {
 					if ei.N(firstNode).M("id").StringZ() == nodeId {
 						if !isMasterNode() {
-							log.Printf("Now I'm master node")
+							sysln("I'm a master node now")
 							setMasterNode(true)
 						}
 					} else {
 						if isMasterNode() {
-							log.Printf("Now I'm not master node")
+							sysln("I'm NOT a master node anymore")
 							setMasterNode(false)
 						}
 					}

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"log"
-
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
 )
@@ -61,14 +59,14 @@ func dbBootstrap() error {
 		return err
 	}
 	if !inStrSlice(tablelist, "tasks") {
-		log.Println("Creating tasks table")
+		sysln("Creating tasks table")
 		_, err := r.TableCreate("tasks").RunWrite(db)
 		if err != nil {
 			return err
 		}
 	}
 	if !inStrSlice(tablelist, "pipes") {
-		log.Println("Creating pipes table")
+		sysln("Creating pipes table")
 		_, err := r.TableCreate("pipes").RunWrite(db)
 		if err != nil {
 			return err
@@ -76,12 +74,12 @@ func dbBootstrap() error {
 
 	}
 	if !inStrSlice(tablelist, "users") {
-		log.Println("Creating users table")
+		sysln("Creating users table")
 		_, err := r.TableCreate("users").RunWrite(db)
 		if err != nil {
 			return err
 		}
-		log.Println("Creating root user")
+		sysln("Creating root user")
 		ud := UserData{User: "root", Salt: safeId(16), Tags: map[string]map[string]interface{}{".": {"@admin": true}}}
 		ud.Pass, err = HashPass("root", ud.Salt)
 		_, err = r.Table("users").Insert(&ud).RunWrite(db)
@@ -91,14 +89,14 @@ func dbBootstrap() error {
 
 	}
 	if !inStrSlice(tablelist, "nodes") {
-		log.Println("Creating nodes table")
+		sysln("Creating nodes table")
 		_, err := r.TableCreate("nodes").RunWrite(db)
 		if err != nil {
 			return err
 		}
 	}
 	if !inStrSlice(tablelist, "locks") {
-		log.Println("Creating locks table")
+		sysln("Creating locks table")
 		_, err := r.TableCreate("locks").RunWrite(db)
 		if err != nil {
 			return err
@@ -112,7 +110,7 @@ func dbBootstrap() error {
 		return err
 	}
 	if !inStrSlice(pipesIndexlist, "subs") {
-		log.Println("Creating subs index on pipes table")
+		sysln("Creating subs index on pipes table")
 		_, err := r.Table("pipes").IndexCreateFunc("subs", func(row r.Term) interface{} {
 			return row.Field("subs")
 		}, r.IndexCreateOpts{Multi: true}).RunWrite(db)
@@ -128,7 +126,7 @@ func dbBootstrap() error {
 		return err
 	}
 	if !inStrSlice(tasksIndexlist, "pspc") {
-		log.Println("Creating pspc index on tasks table")
+		sysln("Creating pspc index on tasks table")
 		_, err := r.Table("tasks").IndexCreateFunc("pspc", func(row r.Term) interface{} {
 			return ei.S{row.Field("path"), row.Field("stat"), row.Field("prio"), row.Field("creationTime")}
 		}).RunWrite(db)
@@ -137,7 +135,7 @@ func dbBootstrap() error {
 		}
 	}
 	if !inStrSlice(tasksIndexlist, "deadLine") {
-		log.Println("Creating deadLine index on tasks table")
+		sysln("Creating deadLine index on tasks table")
 		_, err := r.Table("tasks").IndexCreateFunc("deadLine", func(row r.Term) interface{} {
 			return row.Field("deadLine")
 		}).RunWrite(db)
@@ -146,7 +144,7 @@ func dbBootstrap() error {
 		}
 	}
 	if !inStrSlice(tasksIndexlist, "tses") {
-		log.Println("Creating tses index on tasks table")
+		sysln("Creating tses index on tasks table")
 		_, err := r.Table("tasks").IndexCreateFunc("tses", func(row r.Term) interface{} {
 			return row.Field("tses")
 		}).RunWrite(db)
@@ -162,7 +160,7 @@ func dbBootstrap() error {
 		return err
 	}
 	if !inStrSlice(locksIndexlist, "owner") {
-		log.Println("Creating owner index on locks table")
+		sysln("Creating owner index on locks table")
 		_, err := r.Table("locks").IndexCreateFunc("owner", func(row r.Term) interface{} {
 			return row.Field("owner")
 		}).RunWrite(db)

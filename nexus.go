@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,7 +12,7 @@ var (
 	nodeId      string
 	mainContext context.Context
 	mainCancel  context.CancelFunc
-	sesNotify   *Notifyer      = NewNotifyer()
+	sesNotify   *Notifier      = NewNotifyer()
 	sigChan     chan os.Signal = make(chan os.Signal, 1)
 )
 
@@ -33,7 +32,7 @@ func signalManager() {
 
 func exit(cause string) {
 	if mainContext.Err() == nil {
-		println("Daemon exit, cause: ", cause)
+		errln("Daemon exit. Cause: ", cause)
 		mainCancel()
 	}
 }
@@ -47,7 +46,7 @@ func main() {
 	mainContext, mainCancel = context.WithCancel(context.Background())
 	err := dbOpen()
 	if err != nil {
-		log.Fatal("Error opening rethinkdb connection:", err)
+		errfatalln("Error opening rethinkdb connection:", err)
 	}
 	defer db.Close()
 
@@ -58,8 +57,8 @@ func main() {
 
 	listen()
 
-	log.Printf("Start Daemon, Node ID:%s\r\n", nodeId)
+	sysf("Nexus node [%s] started", nodeId)
 	<-mainContext.Done()
 	cleanNode(nodeId)
-	log.Printf("Stop Daemon, Node ID:%s\r\n", nodeId)
+	sysf("Nexus node [%s] stopped", nodeId)
 }

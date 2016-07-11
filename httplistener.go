@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -19,7 +18,7 @@ type httpwsHandler struct{}
 func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	if req.TLS == nil {
-		log.Printf("[WARN] Unencrypted connection from %s!!\n", req.RemoteAddr)
+		warnln("[WARN] Unencrypted connection from %s!!\n", req.RemoteAddr)
 	}
 
 	if headerContains(req.Header["Connection"], "Upgrade") {
@@ -29,7 +28,7 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 			wsrv := &websocket.Server{}
 			wsrv.Handler = func(ws *websocket.Conn) {
-				log.Print("WebSocket connection from: ", req.RemoteAddr)
+				sysln("WebSocket connection from: ", req.RemoteAddr)
 				NewNexusConn(ws).handle()
 			}
 			if wsrv.Header == nil {
@@ -40,7 +39,7 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 			wsrv.ServeHTTP(res, req)
 
 		} else {
-			log.Printf("Connection dropped for requesting an upgrade to an unsupported protocol: %v\n", req.Header["Upgrade"])
+			warnf("Connection dropped for requesting an upgrade to an unsupported protocol: %v\n", req.Header["Upgrade"])
 			res.WriteHeader(http.StatusBadRequest)
 		}
 
@@ -95,10 +94,10 @@ func httpListener(u *url.URL) {
 
 	handler := http.Handler(&httpwsHandler{})
 
-	log.Println("Listening HTTP  at:", u.Host)
+	sysln("Listening HTTP:\t", u.Host)
 	err := http.ListenAndServe(u.Host, handler)
 	if err != nil {
-		log.Println("HTTP listener error: " + err.Error())
+		errf("HTTP listener error: %s", err.Error())
 		mainCancel()
 		return
 	}
@@ -109,10 +108,10 @@ func httpsListener(u *url.URL) {
 
 	handler := http.Handler(&httpwsHandler{})
 
-	log.Println("Listening HTTPS at:", u.Host)
+	sysln("Listening HTTPS:\t", u.Host)
 	err := http.ListenAndServeTLS(u.Host, opts.SSL.Cert, opts.SSL.Key, handler)
 	if err != nil {
-		log.Println("HTTPS listener error: " + err.Error())
+		errf("HTTPS listener error: %s", err.Error())
 		mainCancel()
 		return
 	}
