@@ -63,6 +63,9 @@ func sslListener(u *url.URL) {
 
 	sysln("Listening SSL:\t", u.Host)
 
+	// Server certs get loaded on first request, so we force one here to crash if certs are missing
+	loadCerts(nil)
+
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
