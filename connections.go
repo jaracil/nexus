@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"sync/atomic"
@@ -201,7 +200,7 @@ func (nc *NexusConn) sendWorker() {
 	for {
 		res, err := nc.pullRes()
 		if err != nil {
-			log.Print("error on sendWorker:", err)
+			warnf("Error on [%s] sendWorker: %s", nc.connId, err)
 			break
 		}
 		if res.Id == nil {
@@ -220,17 +219,17 @@ func (nc *NexusConn) sendWorker() {
 		}
 		buf, err := json.Marshal(res)
 		if err != nil {
-			log.Print("Marshal error: ", err)
+			warnf("[%s] connection marshal error: %s", nc.connId, err)
 			break
 		}
 		buf = append(buf, byte('\r'), byte('\n'))
 		n, err := nc.connTx.Write(buf)
 		if err != nil || n != len(buf) {
-			log.Print("Connection write error: ", err)
+			warnf("[%s] connection write error: %s", nc.connId, err)
 			break
 		}
 	}
-	log.Print("exit from sendWorker")
+	warnf("Exit from [%s] sendWorker", nc.connId)
 }
 
 func (nc *NexusConn) recvWorker() {
@@ -254,11 +253,11 @@ func (nc *NexusConn) recvWorker() {
 		}
 		err = nc.pushReq(req)
 		if err != nil {
-			log.Print("error on recvWorker:", err)
+			warnf("Error on [%s] recvWorker: %s", nc.connId, err)
 			break
 		}
 	}
-	log.Print("exit from recvWorker")
+	warnf("Exit from [%s] recvWorker", nc.connId)
 }
 
 func (nc *NexusConn) watchdog() {
@@ -273,7 +272,7 @@ func (nc *NexusConn) watchdog() {
 			if (now-nc.connRx.GetLast() > max) &&
 				(now-nc.connTx.GetLast() > max) {
 				exit = true
-				log.Printf("Connection [%s] watch dog expired!", nc.connId)
+				warnf("Connection [%s] watchdog expired!", nc.connId)
 			}
 
 		case <-nc.context.Done():
@@ -288,7 +287,7 @@ func (nc *NexusConn) close() {
 		nc.cancelFun()
 		nc.conn.Close()
 		if mainContext.Err() == nil {
-			log.Printf("Close %s session\r\n", nc.connId)
+			warnf("Closing [%s] session", nc.connId)
 			dbClean(nc.connId)
 		}
 	}
@@ -303,10 +302,12 @@ func (nc *NexusConn) handle() {
 	for {
 		req, err := nc.pullReq()
 		if err != nil {
-			log.Print("error on handle:", err)
+			warnf("Error on [%s] connection handler: %s", nc.connId, err)
 			break
 		}
-		log.Printf("Recibida instruccion jsonrpc: %+v", req)
+
+		infof("[%s@%s] %s: %#v - id: %.0f", req.nc.connId, req.nc.conn.RemoteAddr(), req.Method, req.Params, req.Id)
+
 		if (req.Jsonrpc != "2.0" && req.Jsonrpc != "") || req.Method == "" { //"jsonrpc":"2.0" is optional
 			req.Error(ErrInvalidRequest, "", nil)
 			continue

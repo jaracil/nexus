@@ -4,7 +4,11 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"log"
 	"strings"
+
+	"github.com/fatih/color"
 
 	"golang.org/x/crypto/scrypt"
 )
@@ -71,4 +75,46 @@ func HashPass(pass, salt string) (string, error) {
 		return "", errors.New("scrypt error")
 	}
 	return hex.EncodeToString(bdk), nil
+}
+
+// Logging
+
+func infoln(i ...interface{}) {
+	log.Println(i...)
+}
+
+func infof(s string, i ...interface{}) {
+	log.Printf(s, i...)
+}
+
+func errln(i ...interface{}) {
+	log.Println(color.RedString("%s", fmt.Sprint(i...)))
+}
+
+func errf(s string, i ...interface{}) {
+	log.Printf("%s", color.RedString("%s", fmt.Sprintf(s, i...)))
+}
+
+func errfatalln(i ...interface{}) {
+	log.Fatalln(color.RedString("%s", fmt.Sprint(i...)))
+}
+
+func errfatalf(s string, i ...interface{}) {
+	log.Fatalf("%s", color.RedString("%s", fmt.Sprintf(s, i...)))
+}
+
+func warnln(i ...interface{}) {
+	log.Println(color.YellowString("%s", fmt.Sprint(i...)))
+}
+
+func warnf(s string, i ...interface{}) {
+	log.Printf("%s", color.YellowString("%s", fmt.Sprintf(s, i...)))
+}
+
+func sysln(i ...interface{}) {
+	log.Println(color.WhiteString("%s", fmt.Sprint(i...)))
+}
+
+func sysf(s string, i ...interface{}) {
+	log.Printf("%s", color.WhiteString("%s", fmt.Sprintf(s, i...)))
 }

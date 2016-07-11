@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/tls"
-	"log"
 	"net"
 	"net/url"
 )
@@ -12,28 +11,28 @@ func tcpListener(u *url.URL) {
 
 	addr, err := net.ResolveTCPAddr("tcp", u.Host)
 	if err != nil {
-		log.Println("Cannot resolve the tcp address: ", err)
+		errln("Cannot resolve the tcp address: ", err)
 		mainCancel()
 		return
 	}
 
 	listen, err := net.ListenTCP("tcp", addr)
 	if err != nil {
-		log.Println("Can not open tcpListener:", err)
+		errln("Cannot open tcpListener: ", err)
 		mainCancel()
 		return
 	}
 
-	log.Println("Listening TCP   at:", u.Host)
+	sysln("Listening TCP:\t", u.Host)
 
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
-			log.Print("Error acceting tcp socket:", err)
+			errln("Error acceting tcp socket:", err)
 			mainCancel()
 			return
 		}
-		log.Print("TCP connection from:", conn.RemoteAddr())
+		sysln("TCP connection from: ", conn.RemoteAddr())
 		go NewNexusConn(conn).handle()
 	}
 }
@@ -41,10 +40,11 @@ func tcpListener(u *url.URL) {
 func loadCerts(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
 	cert, err := tls.LoadX509KeyPair(opts.SSL.Cert, opts.SSL.Key)
 	if err != nil {
-		log.Println("Cannot load SSL cert/key:", err)
+		errln("Cannot load SSL cert/key:", err)
 		mainCancel()
 		return nil, err
 	}
+
 	return &cert, nil
 }
 
@@ -56,20 +56,21 @@ func sslListener(u *url.URL) {
 
 	listen, err := tls.Listen("tcp", u.Host, tlsConfig)
 	if err != nil {
-		log.Print("Can not open sslListener:", err)
+		errln("Cannot start sslListener: ", err)
 		mainCancel()
 		return
 	}
 
-	log.Println("Listening SSL   at:", u.Host)
+	sysln("Listening SSL:\t", u.Host)
+
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
-			log.Print("Error acceting ssl socket:", err)
+			errln("Error acceting ssl socket: ", err)
 			mainCancel()
 			return
 		}
-		log.Println("SSL connection from:", conn.RemoteAddr())
+		sysln("SSL connection from:", conn.RemoteAddr())
 		go NewNexusConn(conn).handle()
 	}
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"strings"
 	"time"
 
@@ -33,7 +32,7 @@ func pipeTrack() {
 				"old_val": []string{"id"}}).
 			Run(db)
 		if err != nil {
-			log.Printf("Error opening pipeTrack iterator:%s\n", err.Error())
+			errf("Error opening pipeTrack iterator: %s", err.Error())
 			time.Sleep(time.Second)
 			continue
 		}
@@ -41,7 +40,7 @@ func pipeTrack() {
 		for {
 			pf := &PipeFeed{}
 			if !iter.Next(pf) {
-				log.Printf("Error processing feed: %s\n", iter.Err().Error())
+				errf("Error processing feed: %s", iter.Err().Error())
 				iter.Close()
 				break
 			}

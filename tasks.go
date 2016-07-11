@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"strings"
 	"time"
 
@@ -72,7 +71,7 @@ func taskTrack() {
 			Pluck(ei.M{"new_val": []string{"id", "stat", "localId", "detach", "user", "prio", "ttl", "path", "method", "result", "errCode", "errStr", "errObj"}}).
 			Run(db)
 		if err != nil {
-			log.Printf("Error opening taskTrack iterator:%s\n", err.Error())
+			errf("Error opening taskTrack iterator: %s", err.Error())
 			time.Sleep(time.Second)
 			continue
 		}
@@ -80,7 +79,7 @@ func taskTrack() {
 		for {
 			tf := &TaskFeed{}
 			if !iter.Next(tf) {
-				log.Printf("Error processing feed: %s\n", iter.Err().Error())
+				errf("Error processing feed: %s", iter.Err().Error())
 				iter.Close()
 				break
 			}
