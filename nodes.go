@@ -7,6 +7,7 @@ import (
 
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
+	"github.com/shirou/gopsutil/load"
 )
 
 var masterNode = int32(0)
@@ -44,9 +45,16 @@ func nodeTrack() {
 	for !exit {
 		select {
 		case <-tick.C:
+			info := ei.M{
+				"deadline": r.Now().Add(10),
+				"clients":  numconn,
+			}
+			if l, err := load.LoadAvg(); err == nil {
+				info["load"] = l
+			}
 			res, err := r.Table("nodes").
 				Get(nodeId).
-				Update(ei.M{"deadline": r.Now().Add(10)}, r.UpdateOpts{ReturnChanges: true}).
+				Update(info, r.UpdateOpts{ReturnChanges: true}).
 				RunWrite(db)
 			if err != nil {
 				log.Printf("Error, can't update on nodes table [%s]", err.Error())

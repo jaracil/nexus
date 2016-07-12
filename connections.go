@@ -294,7 +294,13 @@ func (nc *NexusConn) close() {
 	}
 }
 
+var numconn int64
+
 func (nc *NexusConn) handle() {
+
+	atomic.AddInt64(&numconn, 1)
+	defer func() { atomic.AddInt64(&numconn, -1) }()
+
 	defer nc.close()
 	go nc.respWorker()
 	go nc.sendWorker()
