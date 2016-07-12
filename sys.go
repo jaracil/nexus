@@ -31,6 +31,22 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidParams, "pass", nil)
 			return
 		}
+		var suser string
+		split := strings.Split(user, ">")
+		switch len(split) {
+		case 1:
+		case 2:
+			if len(split[0]) > 0 && len(split[1]) > 0 {
+				user = split[0]
+				suser = split[1]
+			} else {
+				req.Error(ErrInvalidParams, "", nil)
+				return
+			}
+		default:
+			req.Error(ErrInvalidParams, "", nil)
+			return
+		}
 		ud := &UserData{}
 		cur, err := r.Table("users").Get(strings.ToLower(user)).Run(db)
 		if err != nil {
@@ -57,7 +73,32 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 			return
 		}
 		atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(ud))
-		req.Result(ei.M{"ok": true})
+
+		if suser != "" {
+			tags := nc.getTags(suser)
+			if !(ei.N(tags).M("@admin").BoolZ()) {
+				req.Error(ErrPermissionDenied, "", nil)
+				return
+			}
+			sud := &UserData{}
+			scur, err := r.Table("users").Get(strings.ToLower(suser)).Run(db)
+			if err != nil {
+				req.Error(ErrInternal, "", nil)
+				return
+			}
+			defer scur.Close()
+			err = scur.One(sud)
+			if err != nil {
+				if err == r.ErrEmptyResult {
+					req.Error(ErrPermissionDenied, "", nil)
+					return
+				}
+				req.Error(ErrInternal, "", nil)
+				return
+			}
+			atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(sud))
+		}
+		req.Result(ei.M{"ok": true, "user": nc.user.User})
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
 	}
