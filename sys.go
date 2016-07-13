@@ -99,6 +99,39 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 			atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(sud))
 		}
 		req.Result(ei.M{"ok": true, "user": nc.user.User})
+
+	case "sys.stats":
+		prefix, err := ei.N(req.Params).M("prefix").String()
+		if err != nil {
+			req.Error(ErrInvalidParams, "prefix", nil)
+			return
+		}
+		tags := nc.getTags(prefix)
+		if !(ei.N(tags).M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+		cur, err := r.Table("tasks").Pluck("path").Run(db)
+		if err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+		pulls := make(map[string]int)
+		pushs := make(map[string]int)
+		var task Task
+		for cur.Next(&task) {
+			if strings.HasPrefix(task.Path, "@pull."+prefix) {
+				p := strings.TrimPrefix(task.Path, "@pull.")
+				pulls[p]++
+			} else if strings.HasPrefix(task.Path, prefix) {
+				pushs[task.Path]++
+			}
+		}
+		ret := make(map[string]interface{})
+		ret["pulls"] = pulls
+		ret["pushes"] = pushs
+		req.Result(ret)
+
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
 	}
