@@ -44,7 +44,7 @@ if [ $i -ge 15 ]; then
 fi
 
 # Execute the tests
-go test
+go test -test.v
 
 # Stop and remove the nexus container
 x docker stop $CONTAINER_ID

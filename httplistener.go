@@ -29,7 +29,13 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 			wsrv := &websocket.Server{}
 			wsrv.Handler = func(ws *websocket.Conn) {
-				log.Print("WebSocket connection from: ", req.RemoteAddr)
+				if u, err := url.Parse(req.RemoteAddr); err != nil {
+					ws.Config().Origin, _ = url.Parse("0.0.0.0:1234")
+				} else {
+					ws.Config().Origin = u
+				}
+				log.Print("WebSocket connection from: ", ws.RemoteAddr())
+
 				NewNexusConn(ws).handle()
 			}
 			if wsrv.Header == nil {

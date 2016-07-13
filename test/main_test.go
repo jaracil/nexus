@@ -2,11 +2,8 @@ package test
 
 import (
 	"fmt"
-	"io/ioutil"
-	"log"
 	"math/rand"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -14,102 +11,91 @@ import (
 	nexus "github.com/jaracil/nxcli/nxcore"
 )
 
-var RootSes *nexus.NexusConn
-
 var NexusServer = "localhost:1717"
-var BootstrapErr error = nil
-var Suffix = ""
+var RootSes *nexus.NexusConn
 
 var UserA = "testa"
 var UserB = "testb"
 var UserC = "testc"
 var UserD = "testd"
 
+var Prefix1 = "prefix1"
+var Prefix2 = "prefix2"
+var Prefix3 = "prefix3"
+var Prefix4 = "prefix4"
+
+var Suffix = ""
+
 func TestMain(m *testing.M) {
 	// Nexus server
 	if ns := os.Getenv("NEXUS_SERVER"); ns != "" {
 		NexusServer = ns
 	}
-	if de := strings.ToLower(os.Getenv("NEXUS_DEBUG")); de != "yes" && de != "y" && de != "true" && de != "enabled" {
-		log.SetOutput(ioutil.Discard)
-	}
 
 	// Suffix
 	rand.Seed(time.Now().UnixNano())
 	Suffix = fmt.Sprintf("%04d", rand.Intn(9999))
-	UserA = fmt.Sprintf("%s%s", UserA, Suffix)
-	UserB = fmt.Sprintf("%s%s", UserB, Suffix)
-	UserC = fmt.Sprintf("%s%s", UserC, Suffix)
-	UserD = fmt.Sprintf("%s%s", UserD, Suffix)
-
-	// Bootstrap
-	bootstrap()
-
+	
 	// Run
-	log.Println("Start tests")
 	code := m.Run()
-	log.Println("End tests")
-
-	// Unbootstrap
-	BootstrapErr = nil
-	unbootstrap()
-	if BootstrapErr != nil {
-		log.Println(BootstrapErr)
-	}
 
 	// Exit
 	os.Exit(code)
 }
 
-func bootstrap() {
+func bootstrap(t *testing.T) error {
 	var err error
-
-	log.Println("Bootstrapping...")
 
 	// Login root session
 	RootSes, err = login("root", "root")
 	if err != nil {
-		BootstrapErr = fmt.Errorf("Bootstrap: Logging in as root: %s", err.Error())
-		return
+		return fmt.Errorf("bootstrap: logging in as root: %s", err.Error())
 	}
-
-	log.Println("Created root session")
 
 	// Create users and set tags
 	for _, u := range []string{UserA, UserB, UserC, UserD} {
 		_, err = RootSes.UserCreate(u, u)
 		if err != nil {
-			BootstrapErr = fmt.Errorf("Bootstrap: Creating %s user: %s", u, err.Error())
-			return
+			return fmt.Errorf("bootstrap: creating %s user: %s", u, err.Error())
 		}
 		_, err = RootSes.UserSetTags(u, ".", map[string]interface{}{"@admin": true})
 		if err != nil {
-			BootstrapErr = fmt.Errorf("Bootstrap: Setting admin tag to %s user: %s", u, err.Error())
-			return
+			return fmt.Errorf("bootstrap: setting admin tag to %s user: %s", u, err.Error())
 		}
-		log.Printf("Created user %s\n", u)
+		_, err = RootSes.UserSetTags(u, Prefix1, map[string]interface{}{"@admin": true})
+		if err != nil {
+			return fmt.Errorf("bootstrap: setting admin tag to %s user: %s", u, err.Error())
+		}
+		_, err = RootSes.UserSetTags(u, Prefix2, map[string]interface{}{"@admin": true})
+		if err != nil {
+			return fmt.Errorf("bootstrap: setting admin tag to %s user: %s", u, err.Error())
+		}
+		_, err = RootSes.UserSetTags(u, Prefix3, map[string]interface{}{"@admin": true})
+		if err != nil {
+			return fmt.Errorf("bootstrap: setting admin tag to %s user: %s", u, err.Error())
+		}
+		_, err = RootSes.UserSetTags(u, Prefix4, map[string]interface{}{"@admin": true})
+		if err != nil {
+			return fmt.Errorf("bootstrap: setting admin tag to %s user: %s", u, err.Error())
+		}
+		//t.Logf("Created user %s\n", u)
 	}
-
-	log.Println("Bootstrap done")
+	return nil
 }
 
-func unbootstrap() {
-	log.Println("Unbootstrapping...")
-
+func unbootstrap(t *testing.T) error {
 	// Delete users
 	for _, u := range []string{UserA, UserB, UserC, UserD} {
 		_, err := RootSes.UserDelete(u)
 		if err != nil {
-			BootstrapErr = fmt.Errorf("Unbootstrap: Deleting %s user: %s", u, err.Error())
-			return
+			return fmt.Errorf("Unbootstrap: deleting %s user: %s", u, err.Error())
 		}
-		log.Printf("Deleted user %s\n", u)
+		//t.Logf("Deleted user %s\n", u)
 	}
 
 	// Stop root session
 	RootSes.Close()
-
-	log.Println("Unbootstrap done")
+	return nil
 }
 
 func login(u string, p string) (*nexus.NexusConn, error) {

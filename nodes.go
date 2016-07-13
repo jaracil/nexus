@@ -78,7 +78,7 @@ func nodeTrack() {
 				Filter(r.Row.Field("kill").Eq(false)).
 				Update(ei.M{"kill": true}).
 				RunWrite(db)
-			// Clean killed nodes after 10 sconds.
+			// Clean killed nodes after 10 seconds.
 			cur, err := r.Table("nodes").
 				Filter(r.Row.Field("deadline").Lt(r.Now().Add(-10))).
 				Filter(r.Row.Field("kill").Eq(true)).
@@ -128,5 +128,7 @@ func cleanNode(node string) {
 	err := dbClean(node)
 	if err == nil {
 		r.Table("nodes").Get(node).Delete().RunWrite(db)
+	} else {
+		log.Printf("Error cleaning node [%s]: %s", node, err)
 	}
 }

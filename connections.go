@@ -10,6 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	r "github.com/dancannon/gorethink"
+	"github.com/jaracil/ei"
 	"github.com/jaracil/smartio"
 	"golang.org/x/net/context"
 )
@@ -276,6 +278,8 @@ func (nc *NexusConn) watchdog() {
 				log.Printf("Connection [%s] watch dog expired!", nc.connId)
 			}
 
+			nc.updateSession()
+
 		case <-nc.context.Done():
 			exit = true
 		}
@@ -294,6 +298,36 @@ func (nc *NexusConn) close() {
 	}
 }
 
+func (nc *NexusConn) updateSession() {
+	_, err := r.Table("sessions").
+		Get(nc.connId).
+		Replace(ei.M{
+			"id":            nc.connId,
+			"nodeId":        nodeId,
+			"creationTime":  r.Row.Field("creationTime").Default(r.Now()),
+			"lastSeen":      r.Now(),
+			"remoteAddress": nc.conn.RemoteAddr().String(),
+		}).
+		RunWrite(db)
+
+	if err != nil {
+		log.Println("Error updating session", nc.connId, ":", err)
+		nc.close()
+	}
+}
+
+func (nc *NexusConn) deleteSession() {
+	res, err := r.Table("sessions").
+		Get(nc.connId).
+		Delete().
+		RunWrite(db)
+
+	if err != nil || res.Deleted != 1 {
+		log.Println("Error deregistering session", nc.connId, ":", err)
+		nc.close()
+	}
+}
+
 var numconn int64
 
 func (nc *NexusConn) handle() {
@@ -306,6 +340,10 @@ func (nc *NexusConn) handle() {
 	go nc.sendWorker()
 	go nc.recvWorker()
 	go nc.watchdog()
+
+	nc.updateSession()
+	defer nc.deleteSession()
+
 	for {
 		req, err := nc.pullReq()
 		if err != nil {
