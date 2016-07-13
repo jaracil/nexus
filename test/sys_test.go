@@ -1,7 +1,6 @@
 package test
 
 import (
-	"log"
 	"strings"
 	"testing"
 	"time"
@@ -12,11 +11,9 @@ import (
 
 // TestPing does a ping and waits for a pong
 func TestPing(t *testing.T) {
-	log.Println("Starting TestPing")
-
-	// Bootrap error
-	if BootstrapErr != nil {
-		t.Fatal(BootstrapErr)
+	// Bootrap
+	if err := bootstrap(t); err != nil {
+		t.Fatal(err)
 	}
 
 	// Login success
@@ -31,15 +28,18 @@ func TestPing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ping: %s", err.Error())
 	}
+	
+	// Unbootstrap
+	if err := unbootstrap(t); err != nil {
+		t.Fatal(err)
+	}
 }
 
-// TestConn
-func TestConn(t *testing.T) {
-	log.Println("Starting TestConn")
-
-	// Bootrap error
-	if BootstrapErr != nil {
-		t.Fatal(BootstrapErr)
+// TestLogin
+func TestLogin(t *testing.T) {
+	// Bootrap
+	if err := bootstrap(t); err != nil {
+		t.Fatal(err)
 	}
 
 	// New conn
@@ -72,8 +72,8 @@ func TestConn(t *testing.T) {
 		t.Errorf("login: %s", err.Error())
 	}
 	_, err = conn.Login(UserB, UserB)
-	if err != nil {
-		t.Errorf("relogin: %s", err.Error())
+	if err == nil {
+		t.Errorf("relogin: expecting error")
 	}
 
 	// Login strings
@@ -84,5 +84,10 @@ func TestConn(t *testing.T) {
 	_, err = conn.Login(" "+UserA, UserA)
 	if !IsNexusErrCode(err, nexus.ErrPermissionDenied) {
 		t.Errorf("login with prefix space: expecting ErrPermissionDenied", err.Error())
+	}
+	
+	// Unbootstrap
+	if err := unbootstrap(t); err != nil {
+		t.Fatal(err)
 	}
 }
