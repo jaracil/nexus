@@ -90,6 +90,13 @@ func dbBootstrap() error {
 		}
 
 	}
+	if !inStrSlice(tablelist, "sessions") {
+		log.Println("Creating sessions table")
+		_, err := r.TableCreate("sessions").RunWrite(db)
+		if err != nil {
+			return err
+		}
+	}
 	if !inStrSlice(tablelist, "nodes") {
 		log.Println("Creating nodes table")
 		_, err := r.TableCreate("nodes").RunWrite(db)
@@ -202,10 +209,21 @@ func dbClean(prefix string) (err error) {
 	if err != nil {
 		return
 	}
+
 	// Delete all locks from this prefix
 	_, err = r.Table("locks").
 		Between(prefix, prefix+"\uffff", r.BetweenOpts{Index: "owner"}).
 		Delete().
 		RunWrite(db, r.RunOpts{Durability: "soft"})
+	if err != nil {
+		return
+	}
+
+	// Delete all sessions from this node
+	_, err = r.Table("sessions").
+		Between(prefix, prefix+"\uffff").
+		Delete().
+		RunWrite(db, r.RunOpts{Durability: "soft"})
+
 	return
 }
