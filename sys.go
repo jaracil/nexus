@@ -132,6 +132,21 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 		ret["pushes"] = pushs
 		req.Result(ret)
 
+	case "sys.nodes":
+		tags := nc.getTags("")
+		if !(ei.N(tags).M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+		cur, err := r.Table("nodes").Pluck("id", "clients", "load").Run(db)
+		if err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+		var all []interface{}
+		cur.All(&all)
+		req.Result(all)
+
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
 	}
