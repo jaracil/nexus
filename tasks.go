@@ -363,7 +363,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidTask, "", nil)
 		}
 
-	case "task.stats":
+	case "task.list":
 		prefix, err := ei.N(req.Params).M("prefix").String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "prefix", nil)
