@@ -97,6 +97,22 @@ func dbBootstrap() error {
 			return err
 		}
 	}
+	cur, err = r.Table("sessions").IndexList().Run(db)
+	sessionsIndexList := make([]string, 0)
+	err = cur.All(&sessionsIndexList)
+	cur.Close()
+	if err != nil {
+		return err
+	}
+	if !inStrSlice(sessionsIndexList, "users") {
+		log.Println("Creating users index on tasks sessions")
+		_, err := r.Table("sessions").IndexCreateFunc("users", func(row r.Term) interface{} {
+			return row.Field("user")
+		}).RunWrite(db)
+		if err != nil {
+			return err
+		}
+	}
 	if !inStrSlice(tablelist, "nodes") {
 		log.Println("Creating nodes table")
 		_, err := r.TableCreate("nodes").RunWrite(db)

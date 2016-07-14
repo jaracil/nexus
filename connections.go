@@ -39,6 +39,7 @@ type JsonRpcRes struct {
 
 type NexusConn struct {
 	conn      net.Conn
+	proto     string
 	connRx    *smartio.SmartReader
 	connTx    *smartio.SmartWriter
 	connId    string
@@ -54,6 +55,7 @@ type NexusConn struct {
 func NewNexusConn(conn net.Conn) *NexusConn {
 	nc := &NexusConn{
 		conn:   conn,
+		proto:  "unknown",
 		connRx: smartio.NewSmartReader(conn),
 		connTx: smartio.NewSmartWriter(conn),
 		connId: nodeId + safeId(4),
@@ -307,6 +309,8 @@ func (nc *NexusConn) updateSession() {
 			"creationTime":  r.Row.Field("creationTime").Default(r.Now()),
 			"lastSeen":      r.Now(),
 			"remoteAddress": nc.conn.RemoteAddr().String(),
+			"protocol":      nc.proto,
+			"user":          nc.user.User,
 		}).
 		RunWrite(db)
 
@@ -316,19 +320,13 @@ func (nc *NexusConn) updateSession() {
 	}
 }
 
-func (nc *NexusConn) deleteSession() {
-	res, err := r.Table("sessions").
-		Get(nc.connId).
-		Delete().
-		RunWrite(db)
-
-	if err != nil || res.Deleted != 1 {
-		log.Println("Error deregistering session", nc.connId, ":", err)
-		nc.close()
-	}
-}
+var numconn int64
 
 func (nc *NexusConn) handle() {
+
+	atomic.AddInt64(&numconn, 1)
+	defer func() { atomic.AddInt64(&numconn, -1) }()
+
 	defer nc.close()
 	go nc.respWorker()
 	go nc.sendWorker()
@@ -336,7 +334,6 @@ func (nc *NexusConn) handle() {
 	go nc.watchdog()
 
 	nc.updateSession()
-	defer nc.deleteSession()
 
 	for {
 		req, err := nc.pullReq()

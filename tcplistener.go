@@ -34,7 +34,9 @@ func tcpListener(u *url.URL) {
 			return
 		}
 		log.Print("TCP connection from:", conn.RemoteAddr())
-		go NewNexusConn(conn).handle()
+		nc := NewNexusConn(conn)
+		nc.proto = "tcp"
+		go nc.handle()
 	}
 }
 
@@ -74,6 +76,8 @@ func sslListener(u *url.URL) {
 			return
 		}
 		log.Println("SSL connection from:", conn.RemoteAddr())
-		go NewNexusConn(conn).handle()
+		nc := NewNexusConn(conn)
+		nc.proto = "ssl"
+		go nc.handle()
 	}
 }
