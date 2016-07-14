@@ -45,7 +45,11 @@ fi
 
 # Execute the tests
 go test -test.v
+EXIT_STATUS=$?
 
 # Stop and remove the nexus container
 x docker stop $CONTAINER_ID
 x docker rm $CONTAINER_ID
+
+# Exit with build error status
+exit $EXIT_STATUS
