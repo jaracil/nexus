@@ -98,6 +98,7 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 			}
 			atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(sud))
 		}
+		nc.updateSession()
 		req.Result(ei.M{"ok": true, "user": nc.user.User})
 	case "sys.nodes":
 		tags := nc.getTags("")
