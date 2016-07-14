@@ -6,33 +6,27 @@ import (
 	nexus "github.com/jaracil/nxcli/nxcore"
 )
 
-// TestUser
-func TestUser(t *testing.T) {
-	// Bootrap
-	if err := bootstrap(t); err != nil {
-		t.Fatal(err)
-	}
-	
-	// Create existing
+func TestUserCreateFail(t *testing.T) {
 	_, err := RootSes.UserCreate("root", "whatever")
 	if err == nil {
 		t.Errorf("user.create existing: expecting error")
 	}
-	
-	// Delete unexisting
-	_, err = RootSes.UserDelete("whatever")
+	_, err = RootSes.UserCreate("", "")
+	if err == nil {
+		t.Logf("user.create empty: expecting error")
+		RootSes.UserDelete("")
+	}
+}
+
+func TestUserDeleteFail(t *testing.T) {
+	_, err := RootSes.UserDelete("whatever")
 	if err == nil {
 		t.Errorf("user.delete unexisting: expecting error")
 	}
-	
-	// Create empty
-	_, err = RootSes.UserCreate("", "")
-	if err == nil {
-		t.Errorf("user.create empty: expecting error")
-	}
-	
-	// Create and delete
-	_, err = RootSes.UserCreate("abcdef", "abcdef")
+}
+
+func TestUserCreateDelete(t *testing.T) {
+	_, err := RootSes.UserCreate("abcdef", "abcdef")
 	if err != nil {
 		t.Errorf("user.create: %s", err.Error())
 	}
@@ -40,9 +34,10 @@ func TestUser(t *testing.T) {
 	if err != nil {
 		t.Errorf("user.delete: %s", err.Error())
 	}
-	
-	// SetPass
-	_, err = RootSes.UserSetPass(UserA, "newpass")
+}
+
+func TestUserSetPass(t *testing.T) {
+	_, err := RootSes.UserSetPass(UserA, "newpass")
 	if err != nil {
 		t.Errorf("user.setPass: %s", err.Error())
 	}
@@ -59,9 +54,10 @@ func TestUser(t *testing.T) {
 		t.Errorf("user.login changed pass: %s", err.Error())
 	}
 	conn.Close()
+}
 
-	// Set tags
-	_, err = RootSes.UserSetTags(UserA, Prefix1, map[string]interface{}{
+func TestUserTags(t *testing.T) {
+	_, err := RootSes.UserSetTags(UserA, Prefix1, map[string]interface{}{
 		"test": 1,
 		"prueba": []string {"vaya", "vaya"},
 		"otra": map[string]interface{}{"a":1, "b":2},
@@ -71,8 +67,6 @@ func TestUser(t *testing.T) {
 	if err != nil {
 		t.Errorf("user.setTags: %s", err.Error())
 	}
-	
-	// Push task with tags
 	go func() {
 		sesA, err := login(UserA, UserA)
 		if err != nil {
@@ -86,8 +80,6 @@ func TestUser(t *testing.T) {
 		
 		sesA.Close()
 	}()
-	
-	// Get tags by pulling task
 	task, err := RootSes.TaskPull(Prefix1, time.Second * 30)
 	if err != nil {
 		t.Errorf("task.pull: expecting task: %s", err.Error())
@@ -108,13 +100,10 @@ func TestUser(t *testing.T) {
 		t.Errorf("task.tags missing \"\"")
 	}
 	
-	// Delete tags
 	_, err = RootSes.UserDelTags(UserA, Prefix1, []string{"test", "otra"})
 	if err != nil {
 		t.Errorf("user.delTags: %s", err.Error())
 	}
-	
-	// Push task with less tags
 	go func() {
 		sesA, err := login(UserA, UserA)
 		if err != nil {
@@ -128,8 +117,6 @@ func TestUser(t *testing.T) {
 		
 		sesA.Close()
 	}()
-
-	// Get tags by pulling task
 	task, err = RootSes.TaskPull(Prefix1, time.Second * 30)
 	if err != nil {
 		t.Errorf("task.pull: expecting task: %s", err.Error())
@@ -144,13 +131,7 @@ func TestUser(t *testing.T) {
 		t.Errorf("task.tags missing field prueba")
 	}
 
-	// Set tags to unexisting
 	if _, err = RootSes.UserSetTags("blablabla", Prefix1, map[string]interface{}{"x": "d"}); err == nil {
 		t.Errorf("user.setTags unexisting: expecting error")
-	}
-
-	// Unbootstrap
-	if err := unbootstrap(t); err != nil {
-		t.Fatal(err)
 	}
 }

@@ -7,13 +7,38 @@ import (
 	nexus "github.com/jaracil/nxcli/nxcore"
 )
 
-// TestTopic
-func TestTopic(t *testing.T) {
-	// Bootstrap
-	if err := bootstrap(t); err != nil {
-		t.Fatal(err)
+func TestTopicBadPipe(t *testing.T) {
+	conn, err := login(UserA, UserA)
+	if err != nil {
+		t.Fatalf("sys.login userA: %s", err.Error())
 	}
-	
+	defer conn.Close()
+	_, err = conn.TopicSubscribe(&nexus.Pipe{}, Prefix4)
+	if err == nil {
+		t.Errorf("topic.sub bad pipe: expecting error")
+	}
+	_, err = conn.TopicUnsubscribe(&nexus.Pipe{}, Prefix4)
+	if err == nil {
+		t.Errorf("topic.unsub bad pipe: expecting error")
+	}
+}
+
+func TestTopicNobodySubscribed(t *testing.T) {
+	conn, err := login(UserA, UserA)
+	if err != nil {
+		t.Fatalf("sys.login userA: %s", err.Error())
+	}
+	defer conn.Close()
+	res, err := conn.TopicPublish(Prefix4, "my hello")
+	if err != nil {
+		t.Errorf("topic.publish: %s", err.Error())
+	}
+	if ei.N(res).M("sent").IntZ() != 0 {
+		t.Errorf("topic.publish: expecting nobody listening")
+	}
+}
+
+func TestTopicSubscribePublish(t *testing.T) {
 	sub1conn, err := login(UserA, UserA)
 	if err != nil {
 		t.Fatalf("sys.login userA: %s", err.Error())
@@ -29,25 +54,6 @@ func TestTopic(t *testing.T) {
 	pub2conn, err := login(UserD, UserD)
 	if err != nil {
 		t.Fatalf("sys.login userD: %s", err.Error())
-	}
-	
-	// Topic bad pipe
-	_, err = sub1conn.TopicSubscribe(&nexus.Pipe{}, Prefix4)
-	if err == nil {
-		t.Errorf("topic.sub bad pipe: expecting error")
-	}
-	_, err = sub1conn.TopicUnsubscribe(&nexus.Pipe{}, Prefix4)
-	if err == nil {
-		t.Errorf("topic.unsub bad pipe: expecting error")
-	}
-	
-	// Nobody subscribed
-	res, err := sub1conn.TopicPublish(Prefix4, "my hello")
-	if err != nil {
-		t.Errorf("topic.publish: %s", err.Error())
-	}
-	if ei.N(res).M("sent").IntZ() != 0 {
-		t.Errorf("topic.publish: expecting nobody listening")
 	}
 
 	// Subscribe
@@ -100,7 +106,8 @@ func TestTopic(t *testing.T) {
 	// Unsubscribe with other pipe
 	_, err = sub1conn.TopicUnsubscribe(rpipe2, Prefix4)
 	if err == nil {
-		t.Errorf("topic.unsub with bad pipe: expecting error")
+		t.Logf("topic.unsub with bad pipe: expecting error")
+		sub1conn.TopicSubscribe(rpipe2, Prefix4)
 	} else if !IsNexusErrCode(err, nexus.ErrInvalidPipe) {
 		t.Errorf("topic.unsub with bad pipe: expected ErrInvalidPipe got %s", err.Error())
 	}
@@ -121,7 +128,7 @@ func TestTopic(t *testing.T) {
 		t.Errorf("pipe.read: %s", err.Error())
 	}
 	if len(pipeData.Msgs) != 2 {
-		t.Errorf("pipe.read: expecting 3 messages: got %d", len(pipeData.Msgs))
+		t.Errorf("pipe.read: expecting 2 messages: got %d", len(pipeData.Msgs))
 	}
 	if msg1 := ei.N(pipeData.Msgs[0].Msg).M("msg").IntZ(); msg1 != 1000 {
 		t.Errorf("pipe.read: expecting message 1000 got %d", msg1)
@@ -150,13 +157,9 @@ func TestTopic(t *testing.T) {
 		t.Errorf("pipe.read on closed pipe: expecting error")
 	}
 
-	// Unbootstrap
 	time.Sleep(time.Second*1)
 	pub1conn.Close()
 	pub2conn.Close()
 	sub1conn.Close()
 	sub2conn.Close()
-	if err := unbootstrap(t); err != nil {
-		t.Fatal(err)
-	}
 }

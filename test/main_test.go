@@ -35,15 +35,26 @@ func TestMain(m *testing.M) {
 	// Suffix
 	rand.Seed(time.Now().UnixNano())
 	Suffix = fmt.Sprintf("%04d", rand.Intn(9999))
-	
+
+	// Bootrap
+	if err := bootstrap(); err != nil {
+		fmt.Print(err.Error())
+		os.Exit(1)
+	}
+
 	// Run
 	code := m.Run()
+
+	// Unboostrap
+	if err := unbootstrap(); err != nil {
+		fmt.Print(err.Error())
+	}
 
 	// Exit
 	os.Exit(code)
 }
 
-func bootstrap(t *testing.T) error {
+func bootstrap() error {
 	var err error
 
 	// Login root session
@@ -83,7 +94,7 @@ func bootstrap(t *testing.T) error {
 	return nil
 }
 
-func unbootstrap(t *testing.T) error {
+func unbootstrap() error {
 	// Delete users
 	for _, u := range []string{UserA, UserB, UserC, UserD} {
 		_, err := RootSes.UserDelete(u)

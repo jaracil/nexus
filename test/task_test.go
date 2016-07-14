@@ -6,36 +6,38 @@ import (
 	nexus "github.com/jaracil/nxcli/nxcore"
 )
 
-// TestTask
-func TestTask(t *testing.T) {
-	// Bootstrap
-	if err := bootstrap(t); err != nil {
-		t.Fatal(err)
-	}
-	
+func TestTaskTimeout(t *testing.T) {
 	pushconn, err := login(UserA, UserA)
 	if err != nil {
 		t.Fatalf("sys.login userA: %s", err.Error())
 	}
-
+	defer pushconn.Close()
 	pullconn, err := login(UserB, UserB)
 	if err != nil {
 		t.Fatalf("sys.login userB: %s", err.Error())
 	}
-	
-	// Push timeout
+	defer pullconn.Close()
 	_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second * 2, &nexus.TaskOpts{})
 	if !IsNexusErrCode(err, nexus.ErrTimeout) {
 		t.Error("task.push without pull: expecting timeout")
 	}
-	
-	// Pull timeout
-	task, err := pullconn.TaskPull(Prefix4, time.Second * 2)
+	_, err = pullconn.TaskPull(Prefix4, time.Second * 2)
 	if !IsNexusErrCode(err, nexus.ErrTimeout) {
 		t.Errorf("task.pull: expecting timeout", err.Error())
 	}
+}
 
-	// Task accept
+func TestTaskAccept(t *testing.T) {
+	pushconn, err := login(UserA, UserA)
+	if err != nil {
+		t.Fatalf("sys.login userA: %s", err.Error())
+	}
+	defer pushconn.Close()
+	pullconn, err := login(UserB, UserB)
+	if err != nil {
+		t.Fatalf("sys.login userB: %s", err.Error())
+	}
+	defer pullconn.Close()
 	go func() {
 		res, err := pushconn.TaskPush(Prefix4+".method", nil, time.Second * 20, &nexus.TaskOpts{})
 		if err != nil {
@@ -45,7 +47,7 @@ func TestTask(t *testing.T) {
 			t.Error("task.push: expecting nil res from accept")
 		}
 	}()
-	task, err = pullconn.TaskPull(Prefix4, time.Second * 20)
+	task, err := pullconn.TaskPull(Prefix4, time.Second * 20)
 	if err != nil {
 		t.Errorf("task.pull: %s", err.Error())
 	}
@@ -53,15 +55,27 @@ func TestTask(t *testing.T) {
 	if err != nil {
 		t.Errorf("task.accept: %s", err.Error())
 	}
+}
 
-	// Task reject
+func TestTaskReject(t *testing.T) {
+	pushconn, err := login(UserA, UserA)
+	if err != nil {
+		t.Fatalf("sys.login userA: %s", err.Error())
+	}
+	defer pushconn.Close()
+	pullconn, err := login(UserB, UserB)
+	if err != nil {
+		t.Fatalf("sys.login userB: %s", err.Error())
+	}
+	defer pullconn.Close()
+
 	go func() {
 		_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second * 30, &nexus.TaskOpts{})
 		if !IsNexusErrCode(err, 1) {
 			t.Error("task.push err: expecting error code 1")
 		}
 	}()
-	task, err = pullconn.TaskPull(Prefix4, time.Second * 20)
+	task, err := pullconn.TaskPull(Prefix4, time.Second * 20)
 	if err != nil {
 		t.Errorf("task.pull: %s", err.Error())
 	}
@@ -81,8 +95,20 @@ func TestTask(t *testing.T) {
 	if err == nil {
 		t.Error("task.sendError: expecting an error")
 	}
+}
 
-	// Task expire ttl
+func TestTaskExpireTTL(t *testing.T) {
+	pushconn, err := login(UserA, UserA)
+	if err != nil {
+		t.Fatalf("sys.login userA: %s", err.Error())
+	}
+	defer pushconn.Close()
+	pullconn, err := login(UserB, UserB)
+	if err != nil {
+		t.Fatalf("sys.login userB: %s", err.Error())
+	}
+	defer pullconn.Close()
+
 	go func() {
 		_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second * 30, &nexus.TaskOpts{Ttl: 3})
 		if !IsNexusErrCode(err, nexus.ErrTtlExpired) {
@@ -99,8 +125,20 @@ func TestTask(t *testing.T) {
 			t.Errorf("task.reject: %s", err.Error())
 		}
 	}
+}
+
+func TestTaskPrio(t *testing.T) {
+	pushconn, err := login(UserA, UserA)
+	if err != nil {
+		t.Fatalf("sys.login userA: %s", err.Error())
+	}
+	defer pushconn.Close()
+	pullconn, err := login(UserB, UserB)
+	if err != nil {
+		t.Fatalf("sys.login userB: %s", err.Error())
+	}
+	defer pullconn.Close()
 	
-	// Task prio
 	go func() {
 		_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second * 30, &nexus.TaskOpts{Priority: 5})
 		if err != nil {
@@ -132,7 +170,7 @@ func TestTask(t *testing.T) {
 		}
 	}()
 	time.Sleep(time.Second * 2)
-	task, err = pullconn.TaskPull(Prefix4, time.Second * 6)
+	task, err := pullconn.TaskPull(Prefix4, time.Second * 6)
 	if err != nil {
 		t.Errorf("task.pull: %s", err.Error())
 	}
@@ -172,13 +210,25 @@ func TestTask(t *testing.T) {
 		t.Errorf("task.pull prio: expecting prio -500 got %d", task.Prio)
 	}
 	task.SendResult("ok")
+}
 
-	// Detach
+func TestTaskDetach(t *testing.T) {
+	pushconn, err := login(UserA, UserA)
+	if err != nil {
+		t.Fatalf("sys.login userA: %s", err.Error())
+	}
+	defer pushconn.Close()
+	pullconn, err := login(UserB, UserB)
+	if err != nil {
+		t.Fatalf("sys.login userB: %s", err.Error())
+	}
+	defer pullconn.Close()
+
 	_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second * 20, &nexus.TaskOpts{Detach: true})
 	if err != nil {
 		t.Errorf("task.push err: %s", err.Error())
 	}
-	task, err = pullconn.TaskPull(Prefix4, time.Second * 20)
+	task, err := pullconn.TaskPull(Prefix4, time.Second * 20)
 	if err != nil {
 		t.Errorf("task.pull: %s", err.Error())
 	}
@@ -189,8 +239,20 @@ func TestTask(t *testing.T) {
 	if err != nil {
 		t.Errorf("task.accept: %s", err.Error())
 	}
+}
 
-	// Task cancel
+func TestTaskCancel(t *testing.T) {
+	pushconn, err := login(UserA, UserA)
+	if err != nil {
+		t.Fatalf("sys.login userA: %s", err.Error())
+	}
+	defer pushconn.Close()
+	pullconn, err := login(UserB, UserB)
+	if err != nil {
+		t.Fatalf("sys.login userB: %s", err.Error())
+	}
+	defer pullconn.Close()
+
 	execId, _, err := pushconn.ExecNoWait("task.push", map[string]interface{}{
 		"method": Prefix4+".method",
 		"params": "hello",
@@ -210,13 +272,5 @@ func TestTask(t *testing.T) {
 	_, err = pushconn.Exec("task.cancel", map[string]interface{}{"id": execId})
 	if err != nil {
 		t.Errorf("task.cancel exec: %s", err.Error())
-	}
-
-	// Unbootstrap
-	time.Sleep(time.Second*1)
-	pushconn.Close()
-	pullconn.Close()
-	if err := unbootstrap(t); err != nil {
-		t.Fatal(err)
 	}
 }

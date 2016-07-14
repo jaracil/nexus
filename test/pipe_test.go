@@ -6,25 +6,14 @@ import (
 	nexus "github.com/jaracil/nxcli/nxcore"
 )
 
-// TestPipe
-func TestPipe(t *testing.T) {
-	// Bootstrap
-	if err := bootstrap(t); err != nil {
-		t.Fatal(err)
-	}
-	
-	rconn, err := login(UserA, UserA)
+func TestPipeUnexisting(t *testing.T) {
+	conn, err := login(UserA, UserA)
 	if err != nil {
 		t.Fatalf("sys.login userA: %s", err.Error())
 	}
-
-	wconn, err := login(UserB, UserB)
-	if err != nil {
-		t.Fatalf("sys.login userB: %s", err.Error())
-	}
+	defer conn.Close()
 	
-	// Pipe open unexisting
-	p, _ := rconn.PipeOpen("whatever")
+	p, _ := conn.PipeOpen("whatever")
 	_, err = p.Write("hello")
 	if !IsNexusErrCode(err, nexus.ErrInvalidPipe) {
 		t.Errorf("pipe.write unexisting: expecting ErrInvalidPipe")
@@ -37,8 +26,18 @@ func TestPipe(t *testing.T) {
 	if !IsNexusErrCode(err, nexus.ErrInvalidPipe) {
 		t.Errorf("pipe.close unexisting: expecting ErrInvalidPipe")
 	}
+}
+
+func TestPipeWriteReadClose(t *testing.T) {
+	rconn, err := login(UserA, UserA)
+	if err != nil {
+		t.Fatalf("sys.login userA: %s", err.Error())
+	}
+	wconn, err := login(UserB, UserB)
+	if err != nil {
+		t.Fatalf("sys.login userB: %s", err.Error())
+	}
 	
-	// Pipe write-read & pipe close
 	rpipe, err := rconn.PipeCreate()
 	if err != nil {
 		t.Fatalf("pipe.create: %s", err.Error())
@@ -97,12 +96,26 @@ func TestPipe(t *testing.T) {
 		t.Errorf("pipe.read on closed pipe: expecting error")
 	}
 
-	// Pipe overflow
-	rpipe, err = rconn.PipeCreate(&nexus.PipeOpts{Length: 3})
+	time.Sleep(time.Second*1)
+	wconn.Close()
+	rconn.Close()
+}
+
+func TestPipeOverflow(t *testing.T) {
+	rconn, err := login(UserA, UserA)
+	if err != nil {
+		t.Fatalf("sys.login userA: %s", err.Error())
+	}
+	wconn, err := login(UserB, UserB)
+	if err != nil {
+		t.Fatalf("sys.login userB: %s", err.Error())
+	}
+	
+	rpipe, err := rconn.PipeCreate(&nexus.PipeOpts{Length: 3})
 	if err != nil {
 		t.Errorf("pipe.create: %s", err.Error())
 	}
-	wpipe, err = wconn.PipeOpen(rpipe.Id())
+	wpipe, err := wconn.PipeOpen(rpipe.Id())
 	if err != nil {
 		t.Errorf("pipe.open: %s", err.Error())
 	}
@@ -112,7 +125,7 @@ func TestPipe(t *testing.T) {
 	wpipe.Write(4)
 	wpipe.Write(5)
 	wpipe.Write(6)
-	pipeData, err = rpipe.Read(100, time.Second * 2)
+	pipeData, err := rpipe.Read(100, time.Second * 2)
 	if err != nil {
 		t.Errorf("pipe.read: %s", err.Error())
 	}
@@ -129,12 +142,8 @@ func TestPipe(t *testing.T) {
 	if err != nil {
 		t.Errorf("pipe.close: %s", err.Error())
 	}
-	  
-	// Unbootstrap
+
 	time.Sleep(time.Second*1)
 	wconn.Close()
 	rconn.Close()
-	if err := unbootstrap(t); err != nil {
-		t.Fatal(err)
-	}
 }
