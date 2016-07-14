@@ -307,6 +307,7 @@ func (nc *NexusConn) updateSession() {
 			"creationTime":  r.Row.Field("creationTime").Default(r.Now()),
 			"lastSeen":      r.Now(),
 			"remoteAddress": nc.conn.RemoteAddr().String(),
+			"user":          nc.user.User,
 		}).
 		RunWrite(db)
 

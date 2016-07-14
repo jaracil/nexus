@@ -99,48 +99,39 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 			atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(sud))
 		}
 		req.Result(ei.M{"ok": true, "user": nc.user.User})
-
-	case "sys.stats":
-		prefix, err := ei.N(req.Params).M("prefix").String()
-		if err != nil {
-			req.Error(ErrInvalidParams, "prefix", nil)
-			return
-		}
-		tags := nc.getTags(prefix)
-		if !(ei.N(tags).M("@admin").BoolZ()) {
-			req.Error(ErrPermissionDenied, "", nil)
-			return
-		}
-		cur, err := r.Table("tasks").Pluck("path").Run(db)
-		if err != nil {
-			req.Error(ErrInternal, "", nil)
-			return
-		}
-		pulls := make(map[string]int)
-		pushs := make(map[string]int)
-		var task Task
-		for cur.Next(&task) {
-			if strings.HasPrefix(task.Path, "@pull."+prefix) {
-				p := strings.TrimPrefix(task.Path, "@pull.")
-				pulls[p]++
-			} else if strings.HasPrefix(task.Path, prefix) {
-				pushs[task.Path]++
-			}
-		}
-		ret := make(map[string]interface{})
-		ret["pulls"] = pulls
-		ret["pushes"] = pushs
-		req.Result(ret)
-
 	case "sys.nodes":
 		tags := nc.getTags("")
 		if !(ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
+
 		cur, err := r.Table("nodes").Pluck("id", "clients", "load").Run(db)
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
+			return
+		}
+		var all []interface{}
+		cur.All(&all)
+		req.Result(all)
+	case "sys.sessions":
+		prefix := ei.N(req.Params).M("prefix").StringZ()
+
+		tags := nc.getTags(prefix)
+		if !(ei.N(tags).M("@session.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+		cur, err := r.Table("sessions").
+			Between(prefix, prefix+"\uffff", r.BetweenOpts{Index: "users"}).
+			Group("user").
+			Count().
+			Ungroup().
+			Map(func(row r.Term) interface{} {
+				return ei.M{"user": row.Field("group"), "sessions": row.Field("reduction")}
+			}).Run(db)
+		if err != nil {
+			req.Error(ErrInternal, err.Error(), nil)
 			return
 		}
 		var all []interface{}
