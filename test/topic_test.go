@@ -103,13 +103,14 @@ func TestTopicSubscribePublish(t *testing.T) {
 		}
 	}
 
-	// Unsubscribe with other pipe
+	// Un/subscribe other pipes
 	_, err = sub1conn.TopicUnsubscribe(rpipe2, Prefix4)
-	if err == nil {
-		t.Logf("topic.unsub with bad pipe: expecting error")
-		sub1conn.TopicSubscribe(rpipe2, Prefix4)
-	} else if !IsNexusErrCode(err, nexus.ErrInvalidPipe) {
-		t.Errorf("topic.unsub with bad pipe: expected ErrInvalidPipe got %s", err.Error())
+	if err != nil {
+		t.Errorf("topic.unsub with other pipe: %s", err.Error())
+	}
+	_, err = sub1conn.TopicSubscribe(rpipe2, Prefix4)
+	if err != nil {
+		t.Errorf("topic.sub other pipe: %s", err.Error())
 	}
 	
 	// Unsubscribe and subscribe again

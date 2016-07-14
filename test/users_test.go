@@ -13,7 +13,7 @@ func TestUserCreateFail(t *testing.T) {
 	}
 	_, err = RootSes.UserCreate("", "")
 	if err == nil {
-		t.Logf("user.create empty: expecting error")
+		t.Logf("user.create empty: expecting error: work needed on client input checking")
 		RootSes.UserDelete("")
 	}
 }

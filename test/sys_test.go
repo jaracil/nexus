@@ -38,22 +38,23 @@ func TestLoginFail(t *testing.T) {
 	}
 }
 
-func TestRelogin(t *testing.T) {
-	conn, err := nxcli.Dial(NexusServer, nxcli.NewDialOptions())
-	if err != nil {
-		t.Errorf("dial: %s", err.Error())
-		return
-	}
-	defer conn.Close()
-	_, err = conn.Login(UserA, UserA)
-	if err != nil {
-		t.Errorf("login: %s", err.Error())
-	}
-	_, err = conn.Login(UserB, UserB)
-	if err == nil {
-		t.Logf("relogin: expecting error")
-	}
-}
+// Relogin is allowed by now
+//func TestRelogin(t *testing.T) {
+//	conn, err := nxcli.Dial(NexusServer, nxcli.NewDialOptions())
+//	if err != nil {
+//		t.Errorf("dial: %s", err.Error())
+//		return
+//	}
+//	defer conn.Close()
+//	_, err = conn.Login(UserA, UserA)
+//	if err != nil {
+//		t.Errorf("login: %s", err.Error())
+//	}
+//	_, err = conn.Login(UserB, UserB)
+//	if err == nil {
+//		t.Logf("relogin: expecting error")
+//	}
+//}
 
 func TestLoginWrongStrings(t *testing.T) {
 	conn, err := nxcli.Dial(NexusServer, nxcli.NewDialOptions())
