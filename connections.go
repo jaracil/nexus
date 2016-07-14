@@ -320,18 +320,6 @@ func (nc *NexusConn) updateSession() {
 	}
 }
 
-func (nc *NexusConn) deleteSession() {
-	res, err := r.Table("sessions").
-		Get(nc.connId).
-		Delete().
-		RunWrite(db)
-
-	if err != nil || res.Deleted != 1 {
-		log.Println("Error deregistering session", nc.connId, ":", err)
-		nc.close()
-	}
-}
-
 var numconn int64
 
 func (nc *NexusConn) handle() {
@@ -346,7 +334,6 @@ func (nc *NexusConn) handle() {
 	go nc.watchdog()
 
 	nc.updateSession()
-	defer nc.deleteSession()
 
 	for {
 		req, err := nc.pullReq()
