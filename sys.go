@@ -125,10 +125,10 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 		cur, err := r.Table("sessions").
 			Between(prefix, prefix+"\uffff", r.BetweenOpts{Index: "users"}).
 			Group("user").
-			Count().
+			Pluck("id", "nodeId", "remoteAddress", "creationTime").
 			Ungroup().
 			Map(func(row r.Term) interface{} {
-				return ei.M{"user": row.Field("group"), "sessions": row.Field("reduction")}
+				return ei.M{"user": row.Field("group"), "sessions": row.Field("reduction"), "n": row.Field("reduction").Count()}
 			}).Run(db)
 		if err != nil {
 			req.Error(ErrInternal, err.Error(), nil)
