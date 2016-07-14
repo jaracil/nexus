@@ -36,7 +36,13 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 				}
 				log.Print("WebSocket connection from: ", ws.RemoteAddr())
 
-				NewNexusConn(ws).handle()
+				nc := NewNexusConn(ws)
+				if req.TLS != nil {
+					nc.proto = "wss"
+				} else {
+					nc.proto = "ws"
+				}
+				nc.handle()
 			}
 			if wsrv.Header == nil {
 				wsrv.Header = make(map[string][]string)
@@ -56,6 +62,11 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		netCli, netSrv := net.Pipe()
 		netCliBuf := bufio.NewReader(netCli)
 		ns := NewNexusConn(netSrv)
+		if req.TLS != nil {
+			ns.proto = "https"
+		} else {
+			ns.proto = "http"
+		}
 		defer ns.close()
 		defer netCli.Close()
 		go ns.handle()

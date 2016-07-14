@@ -39,6 +39,7 @@ type JsonRpcRes struct {
 
 type NexusConn struct {
 	conn      net.Conn
+	proto     string
 	connRx    *smartio.SmartReader
 	connTx    *smartio.SmartWriter
 	connId    string
@@ -54,6 +55,7 @@ type NexusConn struct {
 func NewNexusConn(conn net.Conn) *NexusConn {
 	nc := &NexusConn{
 		conn:   conn,
+		proto:  "unknown",
 		connRx: smartio.NewSmartReader(conn),
 		connTx: smartio.NewSmartWriter(conn),
 		connId: nodeId + safeId(4),
@@ -307,6 +309,7 @@ func (nc *NexusConn) updateSession() {
 			"creationTime":  r.Row.Field("creationTime").Default(r.Now()),
 			"lastSeen":      r.Now(),
 			"remoteAddress": nc.conn.RemoteAddr().String(),
+			"protocol":      nc.proto,
 			"user":          nc.user.User,
 		}).
 		RunWrite(db)
