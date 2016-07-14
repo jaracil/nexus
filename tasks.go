@@ -370,7 +370,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			return
 		}
 		tags := nc.getTags(prefix)
-		if !(ei.N(tags).M("@task.stats").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
+		if !(ei.N(tags).M("@task.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
