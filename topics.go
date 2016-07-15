@@ -54,7 +54,7 @@ func (nc *NexusConn) handleTopicReq(req *JsonRpcReq) {
 				"ismsg": false,
 				"msg":   nil,
 			}).
-			RunWrite(db, r.RunOpts{Durability: "soft"})
+			RunWrite(db, r.RunOpts{Durability: "hard"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
@@ -87,7 +87,7 @@ func (nc *NexusConn) handleTopicReq(req *JsonRpcReq) {
 				"ismsg": false,
 				"msg":   nil,
 			}).
-			RunWrite(db, r.RunOpts{Durability: "soft"})
+			RunWrite(db, r.RunOpts{Durability: "hard"})
 		if err != nil {
 			req.Error(ErrInternal, err.Error(), nil)
 			return

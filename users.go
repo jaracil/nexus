@@ -38,7 +38,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrInternal, "", nil)
 			return
 		}
-		_, err = r.Table("users").Insert(&ud).RunWrite(db)
+		_, err = r.Table("users").Insert(&ud).RunWrite(db, r.RunOpts{Durability: "hard"})
 		if err != nil {
 			if r.IsConflictErr(err) {
 				req.Error(ErrUserExists, "", nil)
@@ -59,7 +59,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		res, err := r.Table("users").Get(user).Delete().RunWrite(db)
+		res, err := r.Table("users").Get(user).Delete().RunWrite(db, r.RunOpts{Durability: "hard"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
@@ -91,7 +91,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		res, err := r.Table("users").Get(user).Update(map[string]interface{}{"tags": map[string]interface{}{prefix: tgs}}).RunWrite(db)
+		res, err := r.Table("users").Get(user).Update(map[string]interface{}{"tags": map[string]interface{}{prefix: tgs}}).RunWrite(db, r.RunOpts{Durability: "hard"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
@@ -122,7 +122,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		res, err := r.Table("users").Get(user).Update(map[string]interface{}{"tags": map[string]interface{}{prefix: r.Literal(r.Row.Field("tags").Field(prefix).Without(tgs))}}).RunWrite(db)
+		res, err := r.Table("users").Get(user).Update(map[string]interface{}{"tags": map[string]interface{}{prefix: r.Literal(r.Row.Field("tags").Field(prefix).Without(tgs))}}).RunWrite(db, r.RunOpts{Durability: "hard"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
@@ -154,7 +154,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrInternal, "", nil)
 			return
 		}
-		res, err := r.Table("users").Get(user).Update(map[string]interface{}{"salt": salt, "pass": hp}).RunWrite(db)
+		res, err := r.Table("users").Get(user).Update(map[string]interface{}{"salt": salt, "pass": hp}).RunWrite(db, r.RunOpts{Durability: "hard"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
