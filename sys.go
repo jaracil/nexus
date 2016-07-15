@@ -100,20 +100,6 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 		}
 		nc.updateSession()
 		req.Result(ei.M{"ok": true, "user": nc.user.User})
-	case "sys.nodes":
-		tags := nc.getTags("sys.nodes")
-		if !(ei.N(tags).M("@sys.nodes").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
-			req.Error(ErrPermissionDenied, "", nil)
-			return
-		}
-		cur, err := r.Table("nodes").Pluck("id", "clients", "load").Run(db)
-		if err != nil {
-			req.Error(ErrInternal, "", nil)
-			return
-		}
-		var all []interface{}
-		cur.All(&all)
-		req.Result(all)
 
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
