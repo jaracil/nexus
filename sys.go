@@ -114,29 +114,6 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 		var all []interface{}
 		cur.All(&all)
 		req.Result(all)
-	case "sys.sessions":
-		prefix := ei.N(req.Params).M("prefix").StringZ()
-
-		tags := nc.getTags(prefix)
-		if !(ei.N(tags).M("@sys.sessions").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
-			req.Error(ErrPermissionDenied, "", nil)
-			return
-		}
-		cur, err := r.Table("sessions").
-			Between(prefix, prefix+"\uffff", r.BetweenOpts{Index: "users"}).
-			Group("user").
-			Pluck("id", "nodeId", "remoteAddress", "creationTime", "protocol").
-			Ungroup().
-			Map(func(row r.Term) interface{} {
-				return ei.M{"user": row.Field("group"), "sessions": row.Field("reduction"), "n": row.Field("reduction").Count()}
-			}).Run(db)
-		if err != nil {
-			req.Error(ErrInternal, err.Error(), nil)
-			return
-		}
-		var all []interface{}
-		cur.All(&all)
-		req.Result(all)
 
 	default:
 		req.Error(ErrMethodNotFound, "", nil)

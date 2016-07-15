@@ -151,7 +151,14 @@ func (nc *NexusConn) handleReq(req *JsonRpcReq) {
 	}
 	switch {
 	case strings.HasPrefix(req.Method, "sys."):
-		nc.handleSysReq(req)
+		switch {
+		case strings.HasPrefix(req.Method, "sys.nodes"):
+			nc.handleNodesReq(req)
+		case strings.HasPrefix(req.Method, "sys.sessions"):
+			nc.handleSessionReq(req)
+		default:
+			nc.handleSysReq(req)
+		}
 	case strings.HasPrefix(req.Method, "task."):
 		nc.handleTaskReq(req)
 	case strings.HasPrefix(req.Method, "pipe."):
@@ -162,6 +169,7 @@ func (nc *NexusConn) handleReq(req *JsonRpcReq) {
 		nc.handleUserReq(req)
 	case strings.HasPrefix(req.Method, "sync."):
 		nc.handleSyncReq(req)
+
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
 	}

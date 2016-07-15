@@ -132,3 +132,24 @@ func cleanNode(node string) {
 		log.Printf("Error cleaning node [%s]: %s", node, err)
 	}
 }
+
+func (nc *NexusConn) handleNodesReq(req *JsonRpcReq) {
+	switch req.Method {
+	case "sys.nodes.list":
+		tags := nc.getTags("sys.nodes")
+		if !(ei.N(tags).M("@sys.nodes.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+		cur, err := r.Table("nodes").Pluck("id", "clients", "load").Run(db)
+		if err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+		var all []interface{}
+		cur.All(&all)
+		req.Result(all)
+	default:
+		req.Error(ErrMethodNotFound, "", nil)
+	}
+}

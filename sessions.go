@@ -5,6 +5,7 @@ import (
 	"time"
 
 	r "github.com/dancannon/gorethink"
+	"github.com/jaracil/ei"
 )
 
 type Session struct {
@@ -46,5 +47,55 @@ func sessionTrack() {
 			}
 			sesNotify.Notify(sf.New.Id, sf.New)
 		}
+	}
+}
+
+func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
+	switch req.Method {
+	case "sys.sessions.list":
+		prefix := ei.N(req.Params).M("prefix").StringZ()
+
+		tags := nc.getTags(prefix)
+		if !(ei.N(tags).M("@sys.session.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+		cur, err := r.Table("sessions").
+			Between(prefix, prefix+"\uffff", r.BetweenOpts{Index: "users"}).
+			Group("user").
+			Pluck("id", "nodeId", "remoteAddress", "creationTime", "protocol").
+			Ungroup().
+			Map(func(row r.Term) interface{} {
+				return ei.M{"user": row.Field("group"), "sessions": row.Field("reduction"), "n": row.Field("reduction").Count()}
+			}).Run(db)
+		if err != nil {
+			req.Error(ErrInternal, err.Error(), nil)
+			return
+		}
+		var all []interface{}
+		cur.All(&all)
+		req.Result(all)
+
+	case "sys.sessions.kick":
+		prefix := ei.N(req.Params).M("connId").StringZ()
+
+		tags := nc.getTags("sys.session")
+		if !(ei.N(tags).M("@sys.session.kick").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+		_, err := r.Table("sessions").
+			Between(prefix, prefix+"\uffff").
+			Update(ei.M{"kick": true}).
+			Run(db)
+		if err != nil {
+			req.Error(ErrInternal, err.Error(), nil)
+			return
+		}
+
+		req.Result(ei.M{"ok": true})
+
+	default:
+		req.Error(ErrMethodNotFound, "", nil)
 	}
 }
