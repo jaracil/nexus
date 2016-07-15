@@ -171,28 +171,40 @@ func (nc *NexusConn) respWorker() {
 	defer nc.close()
 	trackCh, err := sesNotify.Register(nc.connId, make(chan interface{}, 1024))
 	if err != nil { // Duplicated session ???
+		log.Printf("Error on [%s] respworker: %s", nc.connId, err)
 		return
 	}
 	defer sesNotify.Unregister(nc.connId)
 	for {
 		select {
 		case d := <-trackCh:
-			resTask := d.(*Task)
-			if resTask.ErrCode != nil {
-				nc.pushRes(
-					&JsonRpcRes{
-						Id:    resTask.LocalId,
-						Error: &JsonRpcErr{Code: *resTask.ErrCode, Message: resTask.ErrStr, Data: resTask.ErrObj},
-					},
-				)
-			} else {
-				nc.pushRes(
-					&JsonRpcRes{
-						Id:     resTask.LocalId,
-						Result: resTask.Result,
-					},
-				)
+
+			switch res := d.(type) {
+
+			case *Task:
+				if res.ErrCode != nil {
+					nc.pushRes(
+						&JsonRpcRes{
+							Id:    res.LocalId,
+							Error: &JsonRpcErr{Code: *res.ErrCode, Message: res.ErrStr, Data: res.ErrObj},
+						},
+					)
+				} else {
+					nc.pushRes(
+						&JsonRpcRes{
+							Id:     res.LocalId,
+							Result: res.Result,
+						},
+					)
+				}
+
+			case *Session:
+				if res.Kick {
+					log.Printf("Connection [%s] has been kicked!", nc.connId)
+					nc.close()
+				}
 			}
+
 		case <-nc.context.Done():
 			return
 		}

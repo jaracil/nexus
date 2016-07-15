@@ -54,6 +54,7 @@ func main() {
 	go nodeTrack()
 	go taskTrack()
 	go pipeTrack()
+	go sessionTrack()
 	go taskPurge()
 
 	listen()
