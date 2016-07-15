@@ -49,7 +49,7 @@ func nodeTrack() {
 				"deadline": r.Now().Add(10),
 				"clients":  numconn,
 			}
-			if l, err := load.LoadAvg(); err == nil {
+			if l, err := load.Avg(); err == nil {
 				info["load"] = l
 			}
 			res, err := r.Table("nodes").
