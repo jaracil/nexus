@@ -1,6 +1,7 @@
 package main
 
 import (
+	"reflect"
 	"sync/atomic"
 	"unsafe"
 
@@ -62,7 +63,7 @@ func maskTags(a map[string]map[string]interface{}, b map[string]map[string]inter
 		if bprefix, ok := b[prefix]; ok {
 			m[prefix] = make(map[string]interface{})
 			for k, v := range tags {
-				if vb, ok := bprefix[k]; ok && v == vb {
+				if vb, ok := bprefix[k]; ok && reflect.DeepEqual(v, vb) {
 					m[prefix][k] = v
 				}
 			}
