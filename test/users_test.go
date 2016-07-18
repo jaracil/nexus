@@ -67,19 +67,20 @@ func TestUserTags(t *testing.T) {
 	if err != nil {
 		t.Errorf("user.setTags: %s", err.Error())
 	}
-	go func() {
-		sesA, err := login(UserA, UserA)
-		if err != nil {
-			t.Errorf("user.login: %s", err.Error())
-		}
-		
-		_, err = sesA.TaskPush(Prefix1+".method", map[string]interface{}{}, time.Second * 20, &nexus.TaskOpts{})	
-		if err != nil {
-			t.Errorf("task.push: %s", err.Error())
-		}
-		
-		sesA.Close()
-	}()
+	
+	sesA, err := login(UserA, UserA)
+	if err != nil {
+		t.Errorf("user.login: %s", err.Error())
+	}
+	
+	_, _, err = sesA.ExecNoWait("task.push", map[string]interface{}{
+		"method": Prefix1+".method",
+		"params": "hello",
+	})
+	if err != nil {
+		t.Errorf("task.push execNoWait: %s", err.Error())
+	}
+	
 	task, err := RootSes.TaskPull(Prefix1, time.Second * 30)
 	if err != nil {
 		t.Errorf("task.pull: expecting task: %s", err.Error())
@@ -99,24 +100,27 @@ func TestUserTags(t *testing.T) {
 	if _, ok := task.Tags[""].(string); !ok {
 		t.Errorf("task.tags missing \"\"")
 	}
+	task.SendResult("ok")
 	
 	_, err = RootSes.UserDelTags(UserA, Prefix1, []string{"test", "otra"})
 	if err != nil {
 		t.Errorf("user.delTags: %s", err.Error())
 	}
-	go func() {
-		sesA, err := login(UserA, UserA)
-		if err != nil {
-			t.Errorf("user.login: %s", err.Error())
-		}
-		
-		_, err = sesA.TaskPush(Prefix1+".method", map[string]interface{}{}, time.Second * 20, &nexus.TaskOpts{})	
-		if err != nil {
-			t.Errorf("task.push: %s", err.Error())
-		}
-		
-		sesA.Close()
-	}()
+
+	_, err = sesA.Login(UserA, UserA)
+	if err != nil {
+		t.Errorf("user.relogin: %s", err.Error())
+	}
+	defer sesA.Close()
+
+	_, _, err = sesA.ExecNoWait("task.push", map[string]interface{}{
+		"method": Prefix1+".method",
+		"params": "hello",
+	})
+	if err != nil {
+		t.Errorf("task.push execNoWait: %s", err.Error())
+	}
+	
 	task, err = RootSes.TaskPull(Prefix1, time.Second * 30)
 	if err != nil {
 		t.Errorf("task.pull: expecting task: %s", err.Error())
@@ -130,7 +134,8 @@ func TestUserTags(t *testing.T) {
 	if _, ok := task.Tags["prueba"]; !ok {
 		t.Errorf("task.tags missing field prueba")
 	}
-
+	task.SendResult("ok")
+	
 	if _, err = RootSes.UserSetTags("blablabla", Prefix1, map[string]interface{}{"x": "d"}); err == nil {
 		t.Errorf("user.setTags unexisting: expecting error")
 	}

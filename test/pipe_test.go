@@ -66,20 +66,20 @@ func TestPipeWriteReadClose(t *testing.T) {
 		t.Errorf("pipe.read: %s", err.Error())
 	}
 	if len(pipeData.Msgs) != 1 {
-		t.Errorf("pipe.read: expecting 1 message")
+		t.Errorf("pipe.read: expecting 1 message: got %d", len(pipeData.Msgs))
 	}
 	if pipeData.Waiting != 4 {
-		t.Errorf("pipe.read: expecting 4 messages waiting")
+		t.Errorf("pipe.read: expecting 4 messages waiting: got %d", pipeData.Waiting)
 	}
 	pipeData, err = rpipe.Read(100, time.Second * 3)
 	if err != nil {
 		t.Errorf("pipe.read: %s", err.Error())
 	}
 	if len(pipeData.Msgs) != 4 {
-		t.Errorf("pipe.read: expecting 4 messages")
+		t.Errorf("pipe.read: expecting 4 messages: got %d", len(pipeData.Msgs))
 	}
 	if pipeData.Waiting != 0 {
-		t.Errorf("pipe.read: expecting 0 messages waiting")
+		t.Errorf("pipe.read: expecting 0 messages waiting: got %d", pipeData.Waiting)
 	}
 	_, err = wpipe.Close()
 	if err == nil {
