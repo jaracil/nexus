@@ -1,9 +1,9 @@
 package test
 
 import (
-	"time"
-	"testing"
 	nexus "github.com/jaracil/nxcli/nxcore"
+	"testing"
+	"time"
 )
 
 func TestUserCreateFail(t *testing.T) {
@@ -58,30 +58,30 @@ func TestUserSetPass(t *testing.T) {
 
 func TestUserTags(t *testing.T) {
 	_, err := RootSes.UserSetTags(UserA, Prefix1, map[string]interface{}{
-		"test": 1,
-		"prueba": []string {"vaya", "vaya"},
-		"otra": map[string]interface{}{"a":1, "b":2},
-		"yes": true,
-		"": "",
+		"test":   1,
+		"prueba": []string{"vaya", "vaya"},
+		"otra":   map[string]interface{}{"a": 1, "b": 2},
+		"yes":    true,
+		"":       "",
 	})
 	if err != nil {
 		t.Errorf("user.setTags: %s", err.Error())
 	}
-	
+
 	sesA, err := login(UserA, UserA)
 	if err != nil {
 		t.Errorf("user.login: %s", err.Error())
 	}
-	
+
 	_, _, err = sesA.ExecNoWait("task.push", map[string]interface{}{
-		"method": Prefix1+".method",
+		"method": Prefix1 + ".method",
 		"params": "hello",
 	})
 	if err != nil {
 		t.Errorf("task.push execNoWait: %s", err.Error())
 	}
-	
-	task, err := RootSes.TaskPull(Prefix1, time.Second * 30)
+
+	task, err := RootSes.TaskPull(Prefix1, time.Second*30)
 	if err != nil {
 		t.Errorf("task.pull: expecting task: %s", err.Error())
 	}
@@ -101,27 +101,32 @@ func TestUserTags(t *testing.T) {
 		t.Errorf("task.tags missing \"\"")
 	}
 	task.SendResult("ok")
-	
+
 	_, err = RootSes.UserDelTags(UserA, Prefix1, []string{"test", "otra"})
 	if err != nil {
 		t.Errorf("user.delTags: %s", err.Error())
 	}
 
-	_, err = sesA.Login(UserA, UserA)
+	//_, err = sesA.Login(UserA, UserA)
+	//if err != nil {
+	//	t.Errorf("user.relogin: %s", err.Error())
+	//}
+	//defer sesA.Close()
+
+	_, err = sesA.Exec("sys.reload", nil)
 	if err != nil {
-		t.Errorf("user.relogin: %s", err.Error())
+		t.Errorf("sys.reload: %s", err.Error())
 	}
-	defer sesA.Close()
 
 	_, _, err = sesA.ExecNoWait("task.push", map[string]interface{}{
-		"method": Prefix1+".method",
+		"method": Prefix1 + ".method",
 		"params": "hello",
 	})
 	if err != nil {
 		t.Errorf("task.push execNoWait: %s", err.Error())
 	}
-	
-	task, err = RootSes.TaskPull(Prefix1, time.Second * 30)
+
+	task, err = RootSes.TaskPull(Prefix1, time.Second*30)
 	if err != nil {
 		t.Errorf("task.pull: expecting task: %s", err.Error())
 	}
@@ -135,7 +140,7 @@ func TestUserTags(t *testing.T) {
 		t.Errorf("task.tags missing field prueba")
 	}
 	task.SendResult("ok")
-	
+
 	if _, err = RootSes.UserSetTags("blablabla", Prefix1, map[string]interface{}{"x": "d"}); err == nil {
 		t.Errorf("user.setTags unexisting: expecting error")
 	}

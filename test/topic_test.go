@@ -1,10 +1,10 @@
 package test
 
 import (
-	"time"
-	"testing"
 	"github.com/jaracil/ei"
 	nexus "github.com/jaracil/nxcli/nxcore"
+	"testing"
+	"time"
 )
 
 func TestTopicBadPipe(t *testing.T) {
@@ -87,9 +87,9 @@ func TestTopicSubscribePublish(t *testing.T) {
 	if _, err = pub1conn.TopicPublish(Prefix4, 4); err != nil {
 		t.Errorf("topic.pub: %s", err.Error())
 	}
-	
+
 	// Read
-	pipeData, err := rpipe1.Read(10, time.Second * 5)
+	pipeData, err := rpipe1.Read(10, time.Second*5)
 	if err != nil {
 		t.Errorf("pipe.read from topic: %s", err.Error())
 	}
@@ -112,7 +112,7 @@ func TestTopicSubscribePublish(t *testing.T) {
 	if err != nil {
 		t.Errorf("topic.sub other pipe: %s", err.Error())
 	}
-	
+
 	// Unsubscribe and subscribe again
 	pub2conn.TopicPublish(Prefix4, 1000)
 	_, err = sub1conn.TopicUnsubscribe(rpipe1, Prefix4)
@@ -124,7 +124,7 @@ func TestTopicSubscribePublish(t *testing.T) {
 		t.Errorf("topic.sub: %s", err.Error())
 	}
 	pub2conn.TopicPublish(Prefix4, 4000)
-	pipeData, err = rpipe1.Read(10, time.Second * 5)
+	pipeData, err = rpipe1.Read(10, time.Second*5)
 	if err != nil {
 		t.Errorf("pipe.read: %s", err.Error())
 	}
@@ -142,7 +142,7 @@ func TestTopicSubscribePublish(t *testing.T) {
 	if _, err = sub2conn.TopicUnsubscribe(rpipe2, Prefix4); err != nil {
 		t.Errorf("topic.unsub: %s", err.Error())
 	}
-	pipeData, err = rpipe2.Read(10, time.Second * 5)
+	pipeData, err = rpipe2.Read(10, time.Second*5)
 	if len(pipeData.Msgs) != 7 {
 		t.Errorf("pipe.read: expecting 7 messages got %d", len(pipeData.Msgs))
 	}
@@ -153,12 +153,12 @@ func TestTopicSubscribePublish(t *testing.T) {
 		t.Errorf("pipe.close: %s", err.Error())
 	}
 	pub1conn.TopicPublish(Prefix4, 16000)
-	pipeData, err = rpipe1.Read(10, time.Second * 5)
+	pipeData, err = rpipe1.Read(10, time.Second*5)
 	if err == nil {
 		t.Errorf("pipe.read on closed pipe: expecting error")
 	}
 
-	time.Sleep(time.Second*1)
+	time.Sleep(time.Second * 1)
 	pub1conn.Close()
 	pub2conn.Close()
 	sub1conn.Close()

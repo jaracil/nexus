@@ -1,10 +1,10 @@
 package test
 
 import (
-	"sync"
-	"time"
-	"testing"
 	nexus "github.com/jaracil/nxcli/nxcore"
+	"sync"
+	"testing"
+	"time"
 )
 
 func TestTaskTimeout(t *testing.T) {
@@ -18,11 +18,11 @@ func TestTaskTimeout(t *testing.T) {
 		t.Fatalf("sys.login userB: %s", err.Error())
 	}
 	defer pullconn.Close()
-	_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second * 2, &nexus.TaskOpts{})
+	_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second*2, &nexus.TaskOpts{})
 	if !IsNexusErrCode(err, nexus.ErrTimeout) {
 		t.Error("task.push without pull: expecting timeout")
 	}
-	_, err = pullconn.TaskPull(Prefix4, time.Second * 2)
+	_, err = pullconn.TaskPull(Prefix4, time.Second*2)
 	if !IsNexusErrCode(err, nexus.ErrTimeout) {
 		t.Errorf("task.pull: expecting timeout", err.Error())
 	}
@@ -41,7 +41,7 @@ func TestTaskAccept(t *testing.T) {
 	}
 	defer pullconn.Close()
 	go func() {
-		res, err := pushconn.TaskPush(Prefix4+".method", nil, time.Second * 20, &nexus.TaskOpts{})
+		res, err := pushconn.TaskPush(Prefix4+".method", nil, time.Second*20, &nexus.TaskOpts{})
 		if err != nil {
 			t.Errorf("task.push err: %s", err.Error())
 		}
@@ -50,7 +50,7 @@ func TestTaskAccept(t *testing.T) {
 		}
 		donech <- true
 	}()
-	task, err := pullconn.TaskPull(Prefix4, time.Second * 20)
+	task, err := pullconn.TaskPull(Prefix4, time.Second*20)
 	if err != nil {
 		t.Errorf("task.pull: %s", err.Error())
 	}
@@ -58,7 +58,7 @@ func TestTaskAccept(t *testing.T) {
 	if err != nil {
 		t.Errorf("task.accept: %s", err.Error())
 	}
-	<- donech
+	<-donech
 }
 
 func TestTaskReject(t *testing.T) {
@@ -75,13 +75,13 @@ func TestTaskReject(t *testing.T) {
 	defer pullconn.Close()
 
 	go func() {
-		_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second * 30, &nexus.TaskOpts{})
+		_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second*30, &nexus.TaskOpts{})
 		if !IsNexusErrCode(err, 1) {
 			t.Error("task.push err: expecting error code 1")
 		}
 		donech <- true
 	}()
-	task, err := pullconn.TaskPull(Prefix4, time.Second * 20)
+	task, err := pullconn.TaskPull(Prefix4, time.Second*20)
 	if err != nil {
 		t.Errorf("task.pull: %s", err.Error())
 	}
@@ -89,7 +89,7 @@ func TestTaskReject(t *testing.T) {
 	if err != nil {
 		t.Errorf("task.reject: %s", err.Error())
 	}
-	task, err = pullconn.TaskPull(Prefix4, time.Second * 20)
+	task, err = pullconn.TaskPull(Prefix4, time.Second*20)
 	if err != nil {
 		t.Errorf("task.pull: %s", err.Error())
 	}
@@ -101,7 +101,7 @@ func TestTaskReject(t *testing.T) {
 	if err == nil {
 		t.Error("task.sendError: expecting an error")
 	}
-	<- donech
+	<-donech
 }
 
 func TestTaskExpireTTL(t *testing.T) {
@@ -118,14 +118,14 @@ func TestTaskExpireTTL(t *testing.T) {
 	defer pullconn.Close()
 
 	go func() {
-		_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second * 30, &nexus.TaskOpts{Ttl: 3})
+		_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second*30, &nexus.TaskOpts{Ttl: 3})
 		if !IsNexusErrCode(err, nexus.ErrTtlExpired) {
 			t.Errorf("task.push err: expecting ErrTtlExpired: %s", err.Error())
 		}
 		donech <- true
 	}()
 	for i := 0; i < 3; i++ {
-		task, err := pullconn.TaskPull(Prefix4, time.Second * 6)
+		task, err := pullconn.TaskPull(Prefix4, time.Second*6)
 		if err != nil {
 			t.Errorf("task.pull: %s", err.Error())
 		}
@@ -134,7 +134,7 @@ func TestTaskExpireTTL(t *testing.T) {
 			t.Errorf("task.reject: %s", err.Error())
 		}
 	}
-	<- donech
+	<-donech
 }
 
 func TestTaskPrio(t *testing.T) {
@@ -149,45 +149,45 @@ func TestTaskPrio(t *testing.T) {
 		t.Fatalf("sys.login userB: %s", err.Error())
 	}
 	defer pullconn.Close()
-	
+
 	wg.Add(5)
 	go func() {
-		_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second * 30, &nexus.TaskOpts{Priority: 5})
+		_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second*30, &nexus.TaskOpts{Priority: 5})
 		if err != nil {
 			t.Errorf("task.push: %s", err.Error())
 		}
 		wg.Done()
 	}()
 	go func() {
-		_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second * 30, &nexus.TaskOpts{Priority: 10})
+		_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second*30, &nexus.TaskOpts{Priority: 10})
 		if err != nil {
 			t.Errorf("task.push: %s", err.Error())
 		}
 		wg.Done()
 	}()
 	go func() {
-		_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second * 30, &nexus.TaskOpts{Priority: 20})
+		_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second*30, &nexus.TaskOpts{Priority: 20})
 		if err != nil {
 			t.Errorf("task.push: %s", err.Error())
 		}
 		wg.Done()
 	}()
 	go func() {
-		_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second * 30, &nexus.TaskOpts{Priority: 15})
+		_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second*30, &nexus.TaskOpts{Priority: 15})
 		if err != nil {
 			t.Errorf("task.push: %s", err.Error())
 		}
 		wg.Done()
 	}()
 	go func() {
-		_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second * 30, &nexus.TaskOpts{Priority: -500})
+		_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second*30, &nexus.TaskOpts{Priority: -500})
 		if err != nil {
 			t.Errorf("task.push: %s", err.Error())
 		}
 		wg.Done()
 	}()
 	time.Sleep(time.Second * 2)
-	task, err := pullconn.TaskPull(Prefix4, time.Second * 6)
+	task, err := pullconn.TaskPull(Prefix4, time.Second*6)
 	if err != nil {
 		t.Errorf("task.pull: %s", err.Error())
 	}
@@ -195,7 +195,7 @@ func TestTaskPrio(t *testing.T) {
 		t.Errorf("task.pull prio: expecting prio 20 got %d", task.Prio)
 	}
 	task.SendResult("ok")
-	task, err = pullconn.TaskPull(Prefix4, time.Second * 6)
+	task, err = pullconn.TaskPull(Prefix4, time.Second*6)
 	if err != nil {
 		t.Errorf("task.pull: %s", err.Error())
 	}
@@ -203,7 +203,7 @@ func TestTaskPrio(t *testing.T) {
 		t.Errorf("task.pull prio: expecting prio 15 got %d", task.Prio)
 	}
 	task.SendResult("ok")
-	task, err = pullconn.TaskPull(Prefix4, time.Second * 6)
+	task, err = pullconn.TaskPull(Prefix4, time.Second*6)
 	if err != nil {
 		t.Errorf("task.pull: %s", err.Error())
 	}
@@ -211,7 +211,7 @@ func TestTaskPrio(t *testing.T) {
 		t.Errorf("task.pull prio: expecting prio 10 got %d", task.Prio)
 	}
 	task.SendResult("ok")
-	task, err = pullconn.TaskPull(Prefix4, time.Second * 6)
+	task, err = pullconn.TaskPull(Prefix4, time.Second*6)
 	if err != nil {
 		t.Errorf("task.pull: %s", err.Error())
 	}
@@ -219,7 +219,7 @@ func TestTaskPrio(t *testing.T) {
 		t.Errorf("task.pull prio: expecting prio 5 got %d", task.Prio)
 	}
 	task.SendResult("ok")
-	task, err = pullconn.TaskPull(Prefix4, time.Second * 6)
+	task, err = pullconn.TaskPull(Prefix4, time.Second*6)
 	if err != nil {
 		t.Errorf("task.pull: %s", err.Error())
 	}
@@ -242,11 +242,11 @@ func TestTaskDetach(t *testing.T) {
 	}
 	defer pullconn.Close()
 
-	_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second * 20, &nexus.TaskOpts{Detach: true})
+	_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second*20, &nexus.TaskOpts{Detach: true})
 	if err != nil {
 		t.Errorf("task.push err: %s", err.Error())
 	}
-	task, err := pullconn.TaskPull(Prefix4, time.Second * 20)
+	task, err := pullconn.TaskPull(Prefix4, time.Second*20)
 	if err != nil {
 		t.Errorf("task.pull: %s", err.Error())
 	}
@@ -273,14 +273,14 @@ func TestTaskCancel(t *testing.T) {
 	defer pullconn.Close()
 
 	execId, _, err := pushconn.ExecNoWait("task.push", map[string]interface{}{
-		"method": Prefix4+".method",
+		"method": Prefix4 + ".method",
 		"params": "hello",
 	})
 	if err != nil {
 		t.Errorf("task.push execNoWait: %s", err.Error())
 	}
 	go func() {
-		_, err = pullconn.TaskPull(Prefix4, time.Second * 20)
+		_, err = pullconn.TaskPull(Prefix4, time.Second*20)
 		if err != nil {
 			if !IsNexusErrCode(err, nexus.ErrCancel) {
 				t.Errorf("task.pull: expecting ErrCancel: %s", err.Error())
@@ -293,5 +293,5 @@ func TestTaskCancel(t *testing.T) {
 	if err != nil {
 		t.Errorf("task.cancel exec: %s", err.Error())
 	}
-	<- donech
+	<-donech
 }

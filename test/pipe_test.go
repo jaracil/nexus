@@ -1,9 +1,9 @@
 package test
 
 import (
-	"time"
-	"testing"
 	nexus "github.com/jaracil/nxcli/nxcore"
+	"testing"
+	"time"
 )
 
 func TestPipeUnexisting(t *testing.T) {
@@ -12,13 +12,13 @@ func TestPipeUnexisting(t *testing.T) {
 		t.Fatalf("sys.login userA: %s", err.Error())
 	}
 	defer conn.Close()
-	
+
 	p, _ := conn.PipeOpen("whatever")
 	_, err = p.Write("hello")
 	if !IsNexusErrCode(err, nexus.ErrInvalidPipe) {
 		t.Errorf("pipe.write unexisting: expecting ErrInvalidPipe")
 	}
-	_, err = p.Read(100, time.Second * 2)
+	_, err = p.Read(100, time.Second*2)
 	if !IsNexusErrCode(err, nexus.ErrInvalidPipe) {
 		t.Errorf("pipe.read unexisting: expecting ErrInvalidPipe")
 	}
@@ -37,7 +37,7 @@ func TestPipeWriteReadClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sys.login userB: %s", err.Error())
 	}
-	
+
 	rpipe, err := rconn.PipeCreate()
 	if err != nil {
 		t.Fatalf("pipe.create: %s", err.Error())
@@ -61,7 +61,7 @@ func TestPipeWriteReadClose(t *testing.T) {
 	if _, err = wpipe.Write(5); err != nil {
 		t.Errorf("pipe.write: %s", err.Error())
 	}
-	pipeData, err := rpipe.Read(1, time.Second * 3)
+	pipeData, err := rpipe.Read(1, time.Second*3)
 	if err != nil {
 		t.Errorf("pipe.read: %s", err.Error())
 	}
@@ -71,7 +71,7 @@ func TestPipeWriteReadClose(t *testing.T) {
 	if pipeData.Waiting != 4 {
 		t.Errorf("pipe.read: expecting 4 messages waiting: got %d", pipeData.Waiting)
 	}
-	pipeData, err = rpipe.Read(100, time.Second * 3)
+	pipeData, err = rpipe.Read(100, time.Second*3)
 	if err != nil {
 		t.Errorf("pipe.read: %s", err.Error())
 	}
@@ -96,7 +96,7 @@ func TestPipeWriteReadClose(t *testing.T) {
 		t.Errorf("pipe.read on closed pipe: expecting error")
 	}
 
-	time.Sleep(time.Second*1)
+	time.Sleep(time.Second * 1)
 	wconn.Close()
 	rconn.Close()
 }
@@ -110,7 +110,7 @@ func TestPipeOverflow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sys.login userB: %s", err.Error())
 	}
-	
+
 	rpipe, err := rconn.PipeCreate(&nexus.PipeOpts{Length: 3})
 	if err != nil {
 		t.Errorf("pipe.create: %s", err.Error())
@@ -125,7 +125,7 @@ func TestPipeOverflow(t *testing.T) {
 	wpipe.Write(4)
 	wpipe.Write(5)
 	wpipe.Write(6)
-	pipeData, err := rpipe.Read(100, time.Second * 2)
+	pipeData, err := rpipe.Read(100, time.Second*2)
 	if err != nil {
 		t.Errorf("pipe.read: %s", err.Error())
 	}
@@ -143,7 +143,7 @@ func TestPipeOverflow(t *testing.T) {
 		t.Errorf("pipe.close: %s", err.Error())
 	}
 
-	time.Sleep(time.Second*1)
+	time.Sleep(time.Second * 1)
 	wconn.Close()
 	rconn.Close()
 }

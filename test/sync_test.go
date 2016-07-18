@@ -1,8 +1,8 @@
 package test
 
 import (
-	"time"
 	"testing"
+	"time"
 )
 
 func TestSyncUnlockNotLocked(t *testing.T) {
@@ -24,7 +24,7 @@ func TestSyncRelock(t *testing.T) {
 		t.Fatalf("login with UserA: %s", err.Error())
 	}
 	defer ses.Close()
-	
+
 	if done, err := ses.Lock(Prefix3); err != nil {
 		t.Errorf("sync.lock: %s", err.Error())
 	} else if !done {
@@ -78,19 +78,19 @@ func TestSyncUnlockSesClose(t *testing.T) {
 	}
 	defer sesa.Close()
 	defer sesb.Close()
-	
+
 	// Lock
 	if done, err := sesb.Lock(Prefix3); err != nil {
 		t.Errorf("sync.lock: %s", err.Error())
 	} else if !done {
 		t.Errorf("sync.lock: expecting done")
 	}
-	
+
 	// Close ses
 	sesb.Close()
-	<- sesb.GetContext().Done()
+	<-sesb.GetContext().Done()
 	time.Sleep(time.Second * 2)
-	
+
 	// Lock
 	if done, err := sesa.Lock(Prefix3); err != nil {
 		t.Errorf("sync.lock: %s", err.Error())
