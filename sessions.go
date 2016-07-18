@@ -69,31 +69,55 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 				return ei.M{"user": row.Field("group"), "sessions": row.Field("reduction"), "n": row.Field("reduction").Count()}
 			}).Run(db)
 		if err != nil {
-			req.Error(ErrInternal, err.Error(), nil)
+			req.Error(ErrInternal, "", nil)
 			return
 		}
 		var all []interface{}
-		cur.All(&all)
+		if err := cur.All(&all); err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
 		req.Result(all)
 
 	case "sys.sessions.kick":
 		prefix := ei.N(req.Params).M("connId").StringZ()
 
-		tags := nc.getTags("sys.session")
+		if len(prefix) < 16 {
+			req.Error(ErrInvalidParams, "", nil)
+			return
+		}
+
+		connuser, err := r.Table("sessions").
+			Between(prefix, prefix+"\uffff").
+			Pluck("user").
+			Run(db)
+		if err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+		var userd interface{}
+		if err := connuser.One(&userd); err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+		user := ei.N(userd).M("user").StringZ()
+		tags := nc.getTags(user)
 		if !(ei.N(tags).M("@sys.session.kick").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		_, err := r.Table("sessions").
+
+		log.Printf("Session [%s] is kicking the user [%s] from session [%s]\n", nc.connId, user, prefix)
+
+		res, err := r.Table("sessions").
 			Between(prefix, prefix+"\uffff").
 			Update(ei.M{"kick": true}).
-			Run(db)
+			RunWrite(db)
 		if err != nil {
-			req.Error(ErrInternal, err.Error(), nil)
+			req.Error(ErrInternal, "", nil)
 			return
 		}
-
-		req.Result(ei.M{"ok": true})
+		req.Result(ei.M{"kicked": res.Replaced})
 
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
