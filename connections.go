@@ -153,9 +153,9 @@ func (nc *NexusConn) handleReq(req *JsonRpcReq) {
 	switch {
 	case strings.HasPrefix(req.Method, "sys."):
 		switch {
-		case strings.HasPrefix(req.Method, "sys.nodes"):
+		case strings.HasPrefix(req.Method, "sys.node."):
 			nc.handleNodesReq(req)
-		case strings.HasPrefix(req.Method, "sys.sessions"):
+		case strings.HasPrefix(req.Method, "sys.session."):
 			nc.handleSessionReq(req)
 		default:
 			nc.handleSysReq(req)

@@ -135,9 +135,9 @@ func cleanNode(node string) {
 
 func (nc *NexusConn) handleNodesReq(req *JsonRpcReq) {
 	switch req.Method {
-	case "sys.nodes.list":
-		tags := nc.getTags("sys.nodes")
-		if !(ei.N(tags).M("@sys.nodes.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
+	case "sys.node.list":
+		tags := nc.getTags("sys.node")
+		if !(ei.N(tags).M("@sys.node.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
