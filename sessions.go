@@ -9,8 +9,9 @@ import (
 )
 
 type Session struct {
-	Id   string `gorethink:"id"`
-	Kick bool   `gorethink:"kick"`
+	Id     string `gorethink:"id"`
+	Kick   bool   `gorethink:"kick"`
+	Reload bool   `gorethink:"reload"`
 }
 
 type SessionFeed struct {
@@ -25,7 +26,7 @@ func sessionTrack() {
 			Between(nodeId, nodeId+"\uffff").
 			Changes(r.ChangesOpts{IncludeInitial: true, Squash: false}).
 			Pluck(map[string]interface{}{
-				"new_val": []string{"id", "kick"},
+				"new_val": []string{"id", "kick", "reload"},
 				"old_val": []string{"id"}}).
 			Run(db)
 		if err != nil {
@@ -52,7 +53,7 @@ func sessionTrack() {
 
 func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 	switch req.Method {
-	case "sys.sessions.list":
+	case "sys.session.list":
 		prefix := ei.N(req.Params).M("prefix").StringZ()
 
 		tags := nc.getTags(prefix)
@@ -79,7 +80,9 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 		}
 		req.Result(all)
 
-	case "sys.sessions.kick":
+	case "sys.session.kick":
+	case "sys.session.reload":
+		action := req.Method[12:]
 		prefix := ei.N(req.Params).M("connId").StringZ()
 
 		if len(prefix) < 16 {
@@ -102,22 +105,22 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 		}
 		user := ei.N(userd).M("user").StringZ()
 		tags := nc.getTags(user)
-		if !(ei.N(tags).M("@sys.session.kick").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
+		if !(ei.N(tags).M("@sys.session."+action).BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
 
-		log.Printf("Session [%s] is kicking the user [%s] from session [%s]\n", nc.connId, user, prefix)
+		log.Printf("Session [%s] is %sing session [%s] from user [%s]\n", nc.connId, action, prefix, user)
 
 		res, err := r.Table("sessions").
 			Between(prefix, prefix+"\uffff").
-			Update(ei.M{"kick": true}).
+			Update(ei.M{action: true}).
 			RunWrite(db)
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
 		}
-		req.Result(ei.M{"kicked": res.Replaced})
+		req.Result(ei.M{action+"ed": res.Replaced})
 
 	default:
 		req.Error(ErrMethodNotFound, "", nil)

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
@@ -207,6 +208,9 @@ func (nc *NexusConn) respWorker() {
 				}
 
 			case *Session:
+				if res.Reload {
+					nc.reload(false)
+				}
 				if res.Kick {
 					log.Printf("Connection [%s] has been kicked!", nc.connId)
 					nc.close()
@@ -318,6 +322,36 @@ func (nc *NexusConn) close() {
 			dbClean(nc.connId)
 		}
 	}
+}
+
+func (nc *NexusConn) reload(fromSameSession bool) (bool, int) {
+	if nc.user == nil {
+		return false, ErrInvalidRequest
+	}
+	ud := &UserData{}
+	cur, err := r.Table("users").Get(strings.ToLower(nc.user.User)).Run(db)
+	if err != nil {
+		return false, ErrInternal
+	}
+	defer cur.Close()
+	err = cur.One(ud)
+	if err != nil {
+		return false, ErrInternal
+	}
+	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(ud))
+	if !fromSameSession {
+		wres, err := r.Table("sessions").
+			Between(nc.connId, nc.connId+"\uffff").
+			Update(ei.M{"reload": false}).
+			RunWrite(db)
+		if err != nil || wres.Replaced == 0 {
+			return false, ErrInternal
+		}
+		log.Printf("Connection [%s] reloaded by other session", nc.connId)
+	} else {
+		log.Printf("Connection [%s] reloaded by itself", nc.connId)
+	}
+	return true, 0
 }
 
 func (nc *NexusConn) updateSession() {
