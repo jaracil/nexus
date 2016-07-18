@@ -136,12 +136,31 @@ func cleanNode(node string) {
 func (nc *NexusConn) handleNodesReq(req *JsonRpcReq) {
 	switch req.Method {
 	case "sys.node.list":
+		limit, err := ei.N(req.Params).M("limit").Int()
+		if err != nil {
+			limit = 100
+		}
+		skip, err := ei.N(req.Params).M("skip").Int()
+		if err != nil {
+			skip = 0
+		}
 		tags := nc.getTags("sys.node")
 		if !(ei.N(tags).M("@sys.node.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		cur, err := r.Table("nodes").Pluck("id", "clients", "load").Run(db)
+
+		term := r.Table("nodes").Pluck("id", "clients", "load")
+
+		if skip >= 0 {
+			term = term.Skip(skip)
+		}
+
+		if limit >= 0 {
+			term = term.Limit(limit)
+		}
+
+		cur, err := term.Run(db)
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return

@@ -166,18 +166,34 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		req.Result(map[string]interface{}{"ok": true})
 	case "user.list":
 		prefix := ei.N(req.Params).M("prefix").StringZ()
-
+		limit, err := ei.N(req.Params).M("limit").Int()
+		if err != nil {
+			limit = 100
+		}
+		skip, err := ei.N(req.Params).M("skip").Int()
+		if err != nil {
+			skip = 0
+		}
 		tags := nc.getTags(prefix)
 		if !(ei.N(tags).M("@user.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		cur, err := r.Table("users").
+		term := r.Table("users").
 			Between(prefix, prefix+"\uffff").
-			Pluck("id", "tags").
-			Map(func(row r.Term) interface{} {
-				return ei.M{"user": row.Field("id"), "tags": row.Field("tags").Default(ei.M{})}
-			}).Run(db)
+			Pluck("id", "tags")
+
+		if skip >= 0 {
+			term = term.Skip(skip)
+		}
+
+		if limit >= 0 {
+			term = term.Limit(limit)
+		}
+
+		cur, err := term.Map(func(row r.Term) interface{} {
+			return ei.M{"user": row.Field("id"), "tags": row.Field("tags").Default(ei.M{})}
+		}).Run(db)
 		if err != nil {
 			req.Error(ErrInternal, err.Error(), nil)
 			return

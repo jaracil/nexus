@@ -369,12 +369,30 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidParams, "prefix", nil)
 			return
 		}
+		limit, err := ei.N(req.Params).M("limit").Int()
+		if err != nil {
+			limit = 100
+		}
+		skip, err := ei.N(req.Params).M("skip").Int()
+		if err != nil {
+			skip = 0
+		}
 		tags := nc.getTags(prefix)
 		if !(ei.N(tags).M("@task.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		cur, err := r.Table("tasks").Pluck("path").Run(db)
+		term := r.Table("tasks").Pluck("path")
+
+		if skip >= 0 {
+			term = term.Skip(skip)
+		}
+
+		if limit >= 0 {
+			term = term.Limit(limit)
+		}
+
+		cur, err := term.Run(db)
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return

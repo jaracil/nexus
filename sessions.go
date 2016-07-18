@@ -55,17 +55,33 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 	switch req.Method {
 	case "sys.session.list":
 		prefix := ei.N(req.Params).M("prefix").StringZ()
-
+		limit, err := ei.N(req.Params).M("limit").Int()
+		if err != nil {
+			limit = 100
+		}
+		skip, err := ei.N(req.Params).M("skip").Int()
+		if err != nil {
+			skip = 0
+		}
 		tags := nc.getTags(prefix)
 		if !(ei.N(tags).M("@sys.session.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		cur, err := r.Table("sessions").
+		term := r.Table("sessions").
 			Between(prefix, prefix+"\uffff", r.BetweenOpts{Index: "users"}).
 			Group("user").
-			Pluck("id", "nodeId", "remoteAddress", "creationTime", "protocol").
-			Ungroup().
+			Pluck("id", "nodeId", "remoteAddress", "creationTime", "protocol")
+
+		if skip >= 0 {
+			term = term.Skip(skip)
+		}
+
+		if limit >= 0 {
+			term = term.Limit(limit)
+		}
+
+		cur, err := term.Ungroup().
 			Map(func(row r.Term) interface{} {
 				return ei.M{"user": row.Field("group"), "sessions": row.Field("reduction"), "n": row.Field("reduction").Count()}
 			}).Run(db)
