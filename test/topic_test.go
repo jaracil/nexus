@@ -89,15 +89,15 @@ func TestTopicSubscribePublish(t *testing.T) {
 	}
 
 	// Read
-	pipeData, err := rpipe1.Read(10, time.Second*5)
+	topicData, err := rpipe1.TopicRead(10, time.Second*5)
 	if err != nil {
 		t.Errorf("pipe.read from topic: %s", err.Error())
 	}
-	if len(pipeData.Msgs) != 4 {
-		t.Errorf("pipe.read from topic: expecting 4 messages: got %d", len(pipeData.Msgs))
+	if len(topicData.Msgs) != 4 {
+		t.Errorf("pipe.read from topic: expecting 4 messages: got %d", len(topicData.Msgs))
 	} else {
 		for i := 0; i < 4; i++ {
-			mn := ei.N(pipeData.Msgs[i].Msg).M("msg").IntZ()
+			mn := ei.N(topicData.Msgs[i].Msg).IntZ()
 			if mn != i+1 {
 				t.Errorf("pipe.read from topic: expecting message %d got %d", i+1, mn)
 			}
@@ -125,27 +125,27 @@ func TestTopicSubscribePublish(t *testing.T) {
 		t.Errorf("topic.sub: %s", err.Error())
 	}
 	pub2conn.TopicPublish(Prefix4, 4000)
-	pipeData, err = rpipe1.Read(10, time.Second*5)
+	topicData, err = rpipe1.TopicRead(10, time.Second*5)
 	if err != nil {
-		t.Errorf("pipe.read: %s", err.Error())
+		t.Errorf("pipe.read from topic: %s", err.Error())
 	}
-	if len(pipeData.Msgs) != 2 {
-		t.Errorf("pipe.read: expecting 2 messages: got %d", len(pipeData.Msgs))
+	if len(topicData.Msgs) != 2 {
+		t.Errorf("pipe.read from topic: expecting 2 messages: got %d", len(topicData.Msgs))
 	}
-	if msg1 := ei.N(pipeData.Msgs[0].Msg).M("msg").IntZ(); msg1 != 1000 {
-		t.Errorf("pipe.read: expecting message 1000 got %d", msg1)
+	if msg1 := ei.N(topicData.Msgs[0].Msg).IntZ(); msg1 != 1000 {
+		t.Errorf("pipe.read from topic: expecting message 1000 got %d", msg1)
 	}
-	if msg2 := ei.N(pipeData.Msgs[1].Msg).M("msg").IntZ(); msg2 != 4000 {
-		t.Errorf("pipe.read: expecting message 4000 got %d", msg2)
+	if msg2 := ei.N(topicData.Msgs[1].Msg).IntZ(); msg2 != 4000 {
+		t.Errorf("pipe.read from topic: expecting message 4000 got %d", msg2)
 	}
 
 	// Unsubscribe and read
 	if _, err = sub2conn.TopicUnsubscribe(rpipe2, Prefix4); err != nil {
 		t.Errorf("topic.unsub: %s", err.Error())
 	}
-	pipeData, err = rpipe2.Read(10, time.Second*5)
-	if len(pipeData.Msgs) != 7 {
-		t.Errorf("pipe.read: expecting 7 messages got %d", len(pipeData.Msgs))
+	topicData, err = rpipe2.TopicRead(10, time.Second*5)
+	if len(topicData.Msgs) != 7 {
+		t.Errorf("pipe.read from topic: expecting 7 messages got %d", len(topicData.Msgs))
 	}
 
 	// Close pipe and read
@@ -154,9 +154,9 @@ func TestTopicSubscribePublish(t *testing.T) {
 		t.Errorf("pipe.close: %s", err.Error())
 	}
 	pub1conn.TopicPublish(Prefix4, 16000)
-	pipeData, err = rpipe1.Read(10, time.Second*5)
+	topicData, err = rpipe1.TopicRead(10, time.Second*5)
 	if err == nil {
-		t.Errorf("pipe.read on closed pipe: expecting error")
+		t.Errorf("pipe.read from topic on closed pipe: expecting error")
 	}
 
 	time.Sleep(time.Second * 1)

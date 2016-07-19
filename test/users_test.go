@@ -78,6 +78,8 @@ func TestUserTags(t *testing.T) {
 		t.Errorf("session.reload: %s", err.Error())
 	}
 	
+	time.Sleep(time.Second)
+	
 	_, _, err = sesA.ExecNoWait("task.push", map[string]interface{}{
 		"method": Prefix1 + ".method",
 		"params": "hello",
