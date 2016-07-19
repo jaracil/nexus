@@ -12,6 +12,7 @@ import (
 
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
+	"github.com/jaracil/nxcli/nxcore"
 	"github.com/jaracil/smartio"
 	"golang.org/x/net/context"
 )
@@ -66,6 +67,24 @@ func NewNexusConn(conn net.Conn) *NexusConn {
 	}
 	nc.context, nc.cancelFun = context.WithCancel(mainContext)
 	return nc
+}
+
+func NewInternalClient() *nxcore.NexusConn {
+	client, server := net.Pipe()
+
+	nc := NewNexusConn(server)
+	nc.proto = "internal"
+	nc.user = &UserData{
+		User: "@internal",
+		Tags: map[string]map[string]interface{}{
+			".": map[string]interface{}{
+				"@admin": true,
+			},
+		},
+	}
+	go nc.handle()
+
+	return nxcore.NewNexusConn(client)
 }
 
 func (req *JsonRpcReq) Error(code int, message string, data interface{}) {

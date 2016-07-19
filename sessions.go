@@ -64,6 +64,7 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 			Between(prefix, prefix+"\uffff", r.BetweenOpts{Index: "users"}).
 			Group("user").
 			Pluck("id", "nodeId", "remoteAddress", "creationTime", "protocol").
+			Filter(r.Row.Field("protocol").Ne("internal")).
 			Ungroup().
 			Map(func(row r.Term) interface{} {
 				return ei.M{"user": row.Field("group"), "sessions": row.Field("reduction"), "n": row.Field("reduction").Count()}
