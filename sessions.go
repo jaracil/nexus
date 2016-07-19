@@ -71,7 +71,8 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 		term := r.Table("sessions").
 			Between(prefix, prefix+"\uffff", r.BetweenOpts{Index: "users"}).
 			Group("user").
-			Pluck("id", "nodeId", "remoteAddress", "creationTime", "protocol")
+			Pluck("id", "nodeId", "remoteAddress", "creationTime", "protocol").
+			Filter(r.Row.Field("protocol").Ne("internal"))
 
 		if skip >= 0 {
 			term = term.Skip(skip)
@@ -136,7 +137,7 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 			req.Error(ErrInternal, "", nil)
 			return
 		}
-		req.Result(ei.M{action+"ed": res.Replaced})
+		req.Result(ei.M{action + "ed": res.Replaced})
 
 	default:
 		req.Error(ErrMethodNotFound, "", nil)

@@ -13,6 +13,7 @@ import (
 
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
+	"github.com/jaracil/nxcli/nxcore"
 	"github.com/jaracil/smartio"
 	"golang.org/x/net/context"
 )
@@ -67,6 +68,24 @@ func NewNexusConn(conn net.Conn) *NexusConn {
 	}
 	nc.context, nc.cancelFun = context.WithCancel(mainContext)
 	return nc
+}
+
+func NewInternalClient() *nxcore.NexusConn {
+	client, server := net.Pipe()
+
+	nc := NewNexusConn(server)
+	nc.proto = "internal"
+	nc.user = &UserData{
+		User: "@internal",
+		Tags: map[string]map[string]interface{}{
+			".": map[string]interface{}{
+				"@admin": true,
+			},
+		},
+	}
+	go nc.handle()
+
+	return nxcore.NewNexusConn(client)
 }
 
 func (req *JsonRpcReq) Error(code int, message string, data interface{}) {
@@ -130,20 +149,24 @@ func (nc *NexusConn) pullReq() (req *JsonRpcReq, err error) {
 	return
 }
 
-func (nc *NexusConn) getTags(prefix string) (tags map[string]interface{}) {
+func getTags(ud *UserData, prefix string) (tags map[string]interface{}) {
 	tags = map[string]interface{}{}
-	if nc.user == nil || nc.user.Tags == nil {
+	if ud == nil || ud.Tags == nil {
 		return
 	}
 	pfs := prefixes(prefix)
 	for _, pf := range pfs {
-		if tm, ok := nc.user.Tags[pf]; ok {
+		if tm, ok := ud.Tags[pf]; ok {
 			for k, v := range tm {
 				tags[k] = v
 			}
 		}
 	}
 	return
+}
+
+func (nc *NexusConn) getTags(prefix string) (tags map[string]interface{}) {
+	return getTags(nc.user, prefix)
 }
 
 func (nc *NexusConn) handleReq(req *JsonRpcReq) {
