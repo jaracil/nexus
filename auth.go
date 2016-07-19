@@ -63,11 +63,11 @@ func (nc *NexusConn) BasicAuth(params interface{}) (string, map[string]map[strin
 	}
 
 	if suser != "" {
-		tags := nc.getTags(suser)
+		tags := getTags(ud, suser)
 		if !(ei.N(tags).M("@admin").BoolZ()) {
 			return "", nil, ErrPermissionDenied
 		}
-		sud, err := loadUserData(user)
+		sud, err := loadUserData(suser)
 		if err != ErrNoError {
 			return "", nil, ErrPermissionDenied
 		}

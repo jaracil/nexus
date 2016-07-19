@@ -56,6 +56,7 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 	}
 }
 
+// Return tags that are equal in both A and B
 func maskTags(a map[string]map[string]interface{}, b map[string]map[string]interface{}) (m map[string]map[string]interface{}) {
 	m = make(map[string]map[string]interface{})
 
