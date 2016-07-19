@@ -34,14 +34,14 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 
 	case "sys.login":
 		var user string
-		var tags map[string]map[string]interface{}
+		var mask map[string]map[string]interface{}
 
 		// Auth
 		method := ei.N(req.Params).M("method").StringZ()
 		switch method {
 		case "", "basic":
 			var err int
-			user, tags, err = nc.BasicAuth(req.Params)
+			user, mask, err = nc.BasicAuth(req.Params)
 			if err != ErrNoError {
 				req.Error(err, "", nil)
 				return
@@ -68,7 +68,7 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 				return
 			}
 			user = loginResponse.User
-			tags = loginResponse.Tags
+			mask = loginResponse.Tags
 		}
 
 		ud, err := loadUserData(user)
@@ -77,9 +77,8 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 			return
 		}
 
-		tags = maskTags(tags, ud.Tags)
+		atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(&UserData{User: ud.User, Mask: mask, Tags: maskTags(ud.Tags, mask)}))
 
-		atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(&UserData{User: ud.User, Tags: tags}))
 		nc.updateSession()
 		req.Result(ei.M{"ok": true, "user": nc.user.User, "connId": nc.connId})
 	case "sys.reload":
@@ -94,10 +93,15 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 }
 
 // Return tags that are equal in both A and B
-func maskTags(a map[string]map[string]interface{}, b map[string]map[string]interface{}) (m map[string]map[string]interface{}) {
+func maskTags(src map[string]map[string]interface{}, mask map[string]map[string]interface{}) (m map[string]map[string]interface{}) {
 	m = make(map[string]map[string]interface{})
-	for prefix, tags := range a {
-		if bprefix, ok := b[prefix]; ok {
+
+	if mask == nil {
+		return src
+	}
+
+	for prefix, tags := range src {
+		if bprefix, ok := mask[prefix]; ok {
 			m[prefix] = make(map[string]interface{})
 			for k, v := range tags {
 				if vb, ok := bprefix[k]; ok && reflect.DeepEqual(v, vb) {

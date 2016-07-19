@@ -10,6 +10,7 @@ type UserData struct {
 	Pass string                            `gorethink:"pass,omitempty"`
 	Salt string                            `gorethink:"salt,omitempty"`
 	Tags map[string]map[string]interface{} `gorethink:"tags,omitempty"`
+	Mask map[string]map[string]interface{} `gorethink:"mask,omitempty"`
 }
 
 var Nobody *UserData = &UserData{User: "nobody", Tags: map[string]map[string]interface{}{}}

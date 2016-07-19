@@ -351,17 +351,13 @@ func (nc *NexusConn) reload(fromSameSession bool) (bool, int) {
 	if nc.user == nil {
 		return false, ErrInvalidRequest
 	}
-	ud := &UserData{}
-	cur, err := r.Table("users").Get(strings.ToLower(nc.user.User)).Run(db)
-	if err != nil {
+	ud, err := loadUserData(nc.user.User)
+	if err != ErrNoError {
 		return false, ErrInternal
 	}
-	defer cur.Close()
-	err = cur.One(ud)
-	if err != nil {
-		return false, ErrInternal
-	}
-	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(ud))
+
+	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(&UserData{User: ud.User, Mask: ud.Mask, Tags: maskTags(ud.Tags, ud.Mask)}))
+
 	if !fromSameSession {
 		wres, err := r.Table("sessions").
 			Between(nc.connId, nc.connId+"\uffff").
