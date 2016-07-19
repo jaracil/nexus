@@ -57,7 +57,12 @@ func TestUserSetPass(t *testing.T) {
 }
 
 func TestUserTags(t *testing.T) {
-	_, err := RootSes.UserSetTags(UserA, Prefix1, map[string]interface{}{
+	sesA, err := login(UserA, UserA)
+	if err != nil {
+		t.Errorf("user.login: %s", err.Error())
+	}
+	
+	_, err = RootSes.UserSetTags(UserA, Prefix1, map[string]interface{}{
 		"test":   1,
 		"prueba": []string{"vaya", "vaya"},
 		"otra":   map[string]interface{}{"a": 1, "b": 2},
@@ -68,11 +73,11 @@ func TestUserTags(t *testing.T) {
 		t.Errorf("user.setTags: %s", err.Error())
 	}
 
-	sesA, err := login(UserA, UserA)
+	_, err = RootSes.SessionReload(sesA.Id())
 	if err != nil {
-		t.Errorf("user.login: %s", err.Error())
+		t.Errorf("session.reload: %s", err.Error())
 	}
-
+	
 	_, _, err = sesA.ExecNoWait("task.push", map[string]interface{}{
 		"method": Prefix1 + ".method",
 		"params": "hello",
@@ -106,12 +111,6 @@ func TestUserTags(t *testing.T) {
 	if err != nil {
 		t.Errorf("user.delTags: %s", err.Error())
 	}
-
-	//_, err = sesA.Login(UserA, UserA)
-	//if err != nil {
-	//	t.Errorf("user.relogin: %s", err.Error())
-	//}
-	//defer sesA.Close()
 
 	_, err = sesA.Exec("sys.reload", nil)
 	if err != nil {

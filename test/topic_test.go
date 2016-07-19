@@ -94,12 +94,13 @@ func TestTopicSubscribePublish(t *testing.T) {
 		t.Errorf("pipe.read from topic: %s", err.Error())
 	}
 	if len(pipeData.Msgs) != 4 {
-		t.Errorf("pipe.read from topic: expecting 4 messages")
-	}
-	for i := 0; i < 4; i++ {
-		mn := ei.N(pipeData.Msgs[i].Msg).M("msg").IntZ()
-		if mn != i+1 {
-			t.Errorf("pipe.read from topic: expecting message %d got %d", i+1, mn)
+		t.Errorf("pipe.read from topic: expecting 4 messages: got %d", len(pipeData.Msgs))
+	} else {
+		for i := 0; i < 4; i++ {
+			mn := ei.N(pipeData.Msgs[i].Msg).M("msg").IntZ()
+			if mn != i+1 {
+				t.Errorf("pipe.read from topic: expecting message %d got %d", i+1, mn)
+			}
 		}
 	}
 

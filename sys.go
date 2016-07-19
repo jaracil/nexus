@@ -99,7 +99,7 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 			atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(sud))
 		}
 		nc.updateSession()
-		req.Result(ei.M{"ok": true, "user": nc.user.User})
+		req.Result(ei.M{"ok": true, "user": nc.user.User, "connId": nc.connId})
 	case "sys.reload":
 		if done, errcode := nc.reload(true); !done {
 			req.Error(errcode, "", nil)
