@@ -120,11 +120,14 @@ func TestTopicSubscribePublish(t *testing.T) {
 	if err != nil {
 		t.Errorf("topic.unsub: %s", err.Error())
 	}
+	time.Sleep(time.Millisecond * 200)
 	pub2conn.TopicPublish(Prefix4, 2000)
 	if _, err = sub1conn.TopicSubscribe(rpipe1, Prefix4); err != nil {
 		t.Errorf("topic.sub: %s", err.Error())
 	}
+	time.Sleep(time.Millisecond * 200)
 	pub2conn.TopicPublish(Prefix4, 4000)
+	time.Sleep(time.Millisecond * 200)
 	topicData, err = rpipe1.TopicRead(10, time.Second*5)
 	if err != nil {
 		t.Errorf("pipe.read from topic: %s", err.Error())

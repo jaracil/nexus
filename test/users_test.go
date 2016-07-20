@@ -13,8 +13,28 @@ func TestUserCreateFail(t *testing.T) {
 	}
 	_, err = RootSes.UserCreate("", "")
 	if err == nil {
-		t.Logf("user.create empty: expecting error: work needed on client input checking")
+		t.Errorf("user.create empty: expecting error")
 		RootSes.UserDelete("")
+	}
+	_, err = RootSes.UserCreate("!invalid", "mypass")
+	if err == nil {
+		t.Errorf("user.create invalid: expecting error")
+		RootSes.UserDelete("!invalid")
+	}
+	_, err = RootSes.UserCreate("sh", "tooshort")
+	if err == nil {
+		t.Errorf("user.create short: expecting error")
+		RootSes.UserDelete("sh")
+	}
+	_, err = RootSes.UserCreate("'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'", "toolong")
+	if err == nil {
+		t.Errorf("user.create long: expecting error")
+		RootSes.UserDelete("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+	}
+	_, err = RootSes.UserCreate("shortpass", "too")
+	if err == nil {
+		t.Errorf("user.create short pass: expecting error")
+		RootSes.UserDelete("shortpass")
 	}
 }
 

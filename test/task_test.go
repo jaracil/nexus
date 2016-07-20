@@ -125,9 +125,10 @@ func TestTaskExpireTTL(t *testing.T) {
 		donech <- true
 	}()
 	for i := 0; i < 3; i++ {
-		task, err := pullconn.TaskPull(Prefix4, time.Second*6)
+		task, err := pullconn.TaskPull(Prefix4, time.Second*10)
 		if err != nil {
 			t.Errorf("task.pull: %s", err.Error())
+			break
 		}
 		_, err = task.Reject()
 		if err != nil {

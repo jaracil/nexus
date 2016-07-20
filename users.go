@@ -18,12 +18,12 @@ var Nobody *UserData = &UserData{User: "nobody", Tags: map[string]map[string]int
 func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 	switch req.Method {
 	case "user.create":
-		user, err := ei.N(req.Params).M("user").String()
+		user, err := ei.N(req.Params).M("user").Lower().F(checkRegexp, _userRegexp).F(checkLen, _userMinLen, _userMaxLen).String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "user", nil)
 			return
 		}
-		pass, err := ei.N(req.Params).M("pass").String()
+		pass, err := ei.N(req.Params).M("pass").F(checkLen, _passwordMinLen, _passwordMaxLen).String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "pass", nil)
 			return
@@ -139,7 +139,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidParams, "user", nil)
 			return
 		}
-		pass, err := ei.N(req.Params).M("pass").String()
+		pass, err := ei.N(req.Params).M("pass").F(checkLen, _passwordMinLen, _passwordMaxLen).String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "pass", nil)
 			return
