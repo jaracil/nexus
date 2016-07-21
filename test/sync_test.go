@@ -57,6 +57,8 @@ func TestSyncLockFail(t *testing.T) {
 		t.Errorf("sync.lock: expecting done")
 	}
 
+	time.Sleep(time.Millisecond * 100)
+	
 	// Fail to lock from another session
 	if done, err := sesb.Lock(Prefix3); err != nil {
 		t.Errorf("sync.lock: %s", err.Error())
@@ -89,7 +91,7 @@ func TestSyncUnlockSesClose(t *testing.T) {
 	// Close ses
 	sesb.Close()
 	<-sesb.GetContext().Done()
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second * 1)
 
 	// Lock
 	if done, err := sesa.Lock(Prefix3); err != nil {

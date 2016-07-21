@@ -18,11 +18,11 @@ func TestTaskTimeout(t *testing.T) {
 		t.Fatalf("sys.login userB: %s", err.Error())
 	}
 	defer pullconn.Close()
-	_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second*2, &nexus.TaskOpts{})
+	_, err = pushconn.TaskPush(Prefix4+".method", nil, time.Second*1, &nexus.TaskOpts{})
 	if !IsNexusErrCode(err, nexus.ErrTimeout) {
 		t.Error("task.push without pull: expecting timeout")
 	}
-	_, err = pullconn.TaskPull(Prefix4, time.Second*2)
+	_, err = pullconn.TaskPull(Prefix4, time.Second*1)
 	if !IsNexusErrCode(err, nexus.ErrTimeout) {
 		t.Errorf("task.pull: expecting timeout", err.Error())
 	}

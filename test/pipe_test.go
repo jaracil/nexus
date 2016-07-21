@@ -61,6 +61,7 @@ func TestPipeWriteReadClose(t *testing.T) {
 	if _, err = wpipe.Write(5); err != nil {
 		t.Errorf("pipe.write: %s", err.Error())
 	}
+	time.Sleep(time.Millisecond * 100)
 	pipeData, err := rpipe.Read(1, time.Second*3)
 	if err != nil {
 		t.Errorf("pipe.read: %s", err.Error())
@@ -125,6 +126,7 @@ func TestPipeOverflow(t *testing.T) {
 	wpipe.Write(4)
 	wpipe.Write(5)
 	wpipe.Write(6)
+	time.Sleep(time.Millisecond * 100)
 	pipeData, err := rpipe.Read(100, time.Second*2)
 	if err != nil {
 		t.Errorf("pipe.read: %s", err.Error())

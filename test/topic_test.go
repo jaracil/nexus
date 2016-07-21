@@ -88,6 +88,8 @@ func TestTopicSubscribePublish(t *testing.T) {
 		t.Errorf("topic.pub: %s", err.Error())
 	}
 
+	time.Sleep(time.Millisecond * 100)
+
 	// Read
 	topicData, err := rpipe1.TopicRead(10, time.Second*5)
 	if err != nil {
@@ -113,6 +115,8 @@ func TestTopicSubscribePublish(t *testing.T) {
 	if err != nil {
 		t.Errorf("topic.sub other pipe: %s", err.Error())
 	}
+
+	time.Sleep(time.Millisecond * 200)
 
 	// Unsubscribe and subscribe again
 	pub2conn.TopicPublish(Prefix4, 1000)
@@ -146,6 +150,7 @@ func TestTopicSubscribePublish(t *testing.T) {
 	if _, err = sub2conn.TopicUnsubscribe(rpipe2, Prefix4); err != nil {
 		t.Errorf("topic.unsub: %s", err.Error())
 	}
+	time.Sleep(time.Millisecond * 100)
 	topicData, err = rpipe2.TopicRead(10, time.Second*5)
 	if len(topicData.Msgs) != 7 {
 		t.Errorf("pipe.read from topic: expecting 7 messages got %d", len(topicData.Msgs))
