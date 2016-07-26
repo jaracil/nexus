@@ -11,6 +11,8 @@ import (
 	"net/url"
 
 	"github.com/jaracil/ei"
+	"github.com/tylerb/graceful"
+	"golang.org/x/net/context"
 	"golang.org/x/net/websocket"
 )
 
@@ -107,30 +109,49 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func httpListener(u *url.URL) {
-	defer exit("http listener goroutine error")
+func httpListener(u *url.URL, ctx context.Context) {
+	defer log.Println("Listener", u, "finished")
+	server := graceful.Server{
+		Server:  &http.Server{Addr: u.Host, Handler: http.Handler(&httpwsHandler{})},
+		Timeout: 0,
+	}
 
-	handler := http.Handler(&httpwsHandler{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			server.Stop(0)
+		}
+	}()
 
-	log.Println("Listening HTTP  at:", u.Host)
-	err := http.ListenAndServe(u.Host, handler)
-	if err != nil {
+	log.Println("Listening on", u)
+	err := server.ListenAndServe()
+	if err != nil && ctx.Err() == nil {
 		log.Println("HTTP listener error: " + err.Error())
-		mainCancel()
+		exit("http listener goroutine error")
 		return
 	}
 }
 
-func httpsListener(u *url.URL) {
-	defer exit("https listener goroutine error")
+func httpsListener(u *url.URL, ctx context.Context) {
+	defer log.Println("Listener", u, "finished")
 
-	handler := http.Handler(&httpwsHandler{})
+	server := graceful.Server{
+		Server:  &http.Server{Addr: u.Host, Handler: http.Handler(&httpwsHandler{})},
+		Timeout: 0,
+	}
 
-	log.Println("Listening HTTPS at:", u.Host)
-	err := http.ListenAndServeTLS(u.Host, opts.SSL.Cert, opts.SSL.Key, handler)
-	if err != nil {
+	go func() {
+		select {
+		case <-ctx.Done():
+			server.Stop(0)
+		}
+	}()
+
+	log.Println("Listening on", u)
+	err := server.ListenAndServeTLS(opts.SSL.Cert, opts.SSL.Key)
+	if err != nil && ctx.Err() == nil {
 		log.Println("HTTPS listener error: " + err.Error())
-		mainCancel()
+		exit("https listener goroutine error")
 		return
 	}
 }

@@ -397,8 +397,10 @@ var numconn int64
 
 func (nc *NexusConn) handle() {
 
-	atomic.AddInt64(&numconn, 1)
-	defer func() { atomic.AddInt64(&numconn, -1) }()
+	if nc.proto != "internal" {
+		atomic.AddInt64(&numconn, 1)
+		defer func() { atomic.AddInt64(&numconn, -1) }()
+	}
 
 	defer nc.close()
 	go nc.respWorker()
