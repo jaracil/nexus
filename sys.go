@@ -127,7 +127,36 @@ func loadUserData(user string) (*UserData, int) {
 		}
 		return nil, ErrInternal
 	}
+
+	expandTags(ud)
+
 	return ud, ErrNoError
+}
+
+func expandTags(ud *UserData) {
+	for prefix, tags := range ud.Tags {
+		for tag, val := range tags {
+			if tag != "@profile" {
+				continue
+			}
+
+			sval, ok := val.(string)
+			if !ok {
+				continue
+			}
+
+			fromUser, err := loadUserData(sval)
+			if err != ErrNoError {
+				continue
+			}
+
+			for etag, eval := range getTags(fromUser, prefix) {
+				if _, ok := tags[etag]; !ok {
+					tags[etag] = eval
+				}
+			}
+		}
+	}
 }
 
 func (nc *NexusConn) BasicAuth(params interface{}) (string, map[string]map[string]interface{}, int) {
