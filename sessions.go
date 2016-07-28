@@ -54,7 +54,7 @@ func sessionTrack() {
 func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 	switch req.Method {
 	case "sys.session.list":
-		prefix := ei.N(req.Params).M("prefix").StringZ()
+		prefix := ei.N(req.Params).M("prefix").Lower().StringZ()
 		limit, err := ei.N(req.Params).M("limit").Int()
 		if err != nil {
 			limit = 100
@@ -120,7 +120,7 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 			req.Error(ErrInternal, "", nil)
 			return
 		}
-		user := ei.N(userd).M("user").StringZ()
+		user := ei.N(userd).M("user").Lower().StringZ()
 		tags := nc.getTags(user)
 		if !(ei.N(tags).M("@sys.session."+action).BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)

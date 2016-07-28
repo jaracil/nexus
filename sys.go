@@ -37,7 +37,7 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 		var mask map[string]map[string]interface{}
 
 		// Auth
-		method := ei.N(req.Params).M("method").StringZ()
+		method := ei.N(req.Params).M("method").Lower().StringZ()
 		switch method {
 		case "", "basic":
 			var err int
@@ -166,11 +166,11 @@ func mergeTags(src, dst *UserData) {
 }
 
 func (nc *NexusConn) BasicAuth(params interface{}) (string, map[string]map[string]interface{}, int) {
-	user, err := ei.N(params).M("user").String()
+	user, err := ei.N(params).M("user").Lower().String()
 	if err != nil {
 		return "", nil, ErrInvalidParams
 	}
-	pass, err := ei.N(params).M("pass").String()
+	pass, err := ei.N(params).M("pass").Lower().String()
 	if err != nil {
 		return "", nil, ErrInvalidParams
 	}

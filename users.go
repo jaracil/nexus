@@ -51,7 +51,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		}
 		req.Result(map[string]interface{}{"ok": true})
 	case "user.delete":
-		user, err := ei.N(req.Params).M("user").String()
+		user, err := ei.N(req.Params).M("user").Lower().String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "user", nil)
 			return
@@ -73,12 +73,12 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		}
 
 	case "user.setTags":
-		user, err := ei.N(req.Params).M("user").String()
+		user, err := ei.N(req.Params).M("user").Lower().String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "user", nil)
 			return
 		}
-		prefix, err := ei.N(req.Params).M("prefix").String()
+		prefix, err := ei.N(req.Params).M("prefix").Lower().String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "prefix", nil)
 			return
@@ -104,12 +104,12 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		}
 		req.Result(map[string]interface{}{"ok": true})
 	case "user.delTags":
-		user, err := ei.N(req.Params).M("user").String()
+		user, err := ei.N(req.Params).M("user").Lower().String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "user", nil)
 			return
 		}
-		prefix, err := ei.N(req.Params).M("prefix").String()
+		prefix, err := ei.N(req.Params).M("prefix").Lower().String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "prefix", nil)
 			return
@@ -135,7 +135,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		}
 		req.Result(map[string]interface{}{"ok": true})
 	case "user.setPass":
-		user, err := ei.N(req.Params).M("user").String()
+		user, err := ei.N(req.Params).M("user").Lower().String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "user", nil)
 			return
@@ -167,7 +167,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		}
 		req.Result(map[string]interface{}{"ok": true})
 	case "user.list":
-		prefix := ei.N(req.Params).M("prefix").StringZ()
+		prefix := ei.N(req.Params).M("prefix").Lower().StringZ()
 		limit, err := ei.N(req.Params).M("limit").Int()
 		if err != nil {
 			limit = 100

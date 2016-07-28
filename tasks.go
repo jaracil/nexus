@@ -204,7 +204,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 	var null *int
 	switch req.Method {
 	case "task.push":
-		method, err := ei.N(req.Params).M("method").String()
+		method, err := ei.N(req.Params).M("method").Lower().String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "method", nil)
 			return
@@ -257,7 +257,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		if req.Id == nil {
 			return
 		}
-		prefix := ei.N(req.Params).M("prefix").StringZ()
+		prefix := ei.N(req.Params).M("prefix").Lower().StringZ()
 		if prefix == "" {
 			req.Error(ErrInvalidParams, "prefix", nil)
 			return
@@ -364,7 +364,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		}
 
 	case "task.list":
-		prefix, err := ei.N(req.Params).M("prefix").String()
+		prefix, err := ei.N(req.Params).M("prefix").Lower().String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "prefix", nil)
 			return
