@@ -114,6 +114,10 @@ func maskTags(src map[string]map[string]interface{}, mask map[string]map[string]
 }
 
 func loadUserData(user string) (*UserData, int) {
+	return loadUserDataWithTemplates(user, make(map[string]bool))
+}
+
+func loadUserDataWithTemplates(user string, loadedTemplates map[string]bool) (*UserData, int) {
 	ud := &UserData{}
 	cur, err := r.Table("users").Get(strings.ToLower(user)).Run(db)
 	if err != nil {
@@ -127,7 +131,38 @@ func loadUserData(user string) (*UserData, int) {
 		}
 		return nil, ErrInternal
 	}
+	grabTemplates(ud, loadedTemplates)
 	return ud, ErrNoError
+}
+
+func grabTemplates(ud *UserData, loadedTemplates map[string]bool) {
+	for _, template := range ud.Templates {
+		if loadedTemplates[template] {
+			continue
+		}
+		loadedTemplates[template] = true
+
+		tud, err := loadUserDataWithTemplates(template, loadedTemplates)
+		if err != ErrNoError {
+			continue
+		}
+
+		mergeTags(tud, ud)
+	}
+}
+
+// Bring from src tags that did not exist on dst
+func mergeTags(src, dst *UserData) {
+	for prefix, tags := range src.Tags {
+		for tag, val := range tags {
+			if _, ok := dst.Tags[prefix]; !ok {
+				dst.Tags[prefix] = make(map[string]interface{})
+			}
+			if _, ok := dst.Tags[prefix][tag]; !ok {
+				dst.Tags[prefix][tag] = val
+			}
+		}
+	}
 }
 
 func (nc *NexusConn) BasicAuth(params interface{}) (string, map[string]map[string]interface{}, int) {

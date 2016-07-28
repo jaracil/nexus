@@ -6,11 +6,12 @@ import (
 )
 
 type UserData struct {
-	User string                            `gorethink:"id,omitempty"`
-	Pass string                            `gorethink:"pass,omitempty"`
-	Salt string                            `gorethink:"salt,omitempty"`
-	Tags map[string]map[string]interface{} `gorethink:"tags,omitempty"`
-	Mask map[string]map[string]interface{} `gorethink:"mask,omitempty"`
+	User      string                            `gorethink:"id,omitempty"`
+	Pass      string                            `gorethink:"pass,omitempty"`
+	Salt      string                            `gorethink:"salt,omitempty"`
+	Tags      map[string]map[string]interface{} `gorethink:"tags,omitempty"`
+	Mask      map[string]map[string]interface{} `gorethink:"mask,omitempty"`
+	Templates []string                          `gorethink:"templates,omitempty"`
 }
 
 var Nobody *UserData = &UserData{User: "nobody", Tags: map[string]map[string]interface{}{}}
@@ -33,7 +34,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		ud := UserData{User: user, Salt: safeId(16), Tags: map[string]map[string]interface{}{}}
+		ud := UserData{User: user, Salt: safeId(16), Tags: map[string]map[string]interface{}{}, Templates: []string{}}
 		ud.Pass, err = HashPass(pass, ud.Salt)
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
@@ -202,6 +203,82 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		var all []interface{}
 		cur.All(&all)
 		req.Result(all)
+
+	case "user.addTemplate":
+		user, err := ei.N(req.Params).M("user").Lower().String()
+		if err != nil {
+			req.Error(ErrInvalidParams, "user", nil)
+			return
+		}
+
+		template, err := ei.N(req.Params).M("template").Lower().String()
+		if err != nil {
+			req.Error(ErrInvalidParams, "template", nil)
+			return
+		}
+
+		userTags := ei.N(nc.getTags(user))
+		if !(userTags.M("@"+req.Method).BoolZ() || userTags.M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+
+		templateTags := ei.N(nc.getTags(template))
+		if !(templateTags.M("@"+req.Method).BoolZ() || templateTags.M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+
+		res, err := r.Table("users").Get(user).Update(map[string]interface{}{
+			"templates": r.Row.Field("templates").Default([]string{}).SetInsert(template),
+		}).RunWrite(db, r.RunOpts{Durability: "hard"})
+		if err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+		if res.Unchanged == 0 && res.Replaced == 0 {
+			req.Error(ErrInvalidUser, "", nil)
+			return
+		}
+		req.Result(map[string]interface{}{"ok": true})
+
+	case "user.delTemplate":
+		user, err := ei.N(req.Params).M("user").Lower().String()
+		if err != nil {
+			req.Error(ErrInvalidParams, "user", nil)
+			return
+		}
+
+		template, err := ei.N(req.Params).M("template").Lower().String()
+		if err != nil {
+			req.Error(ErrInvalidParams, "template", nil)
+			return
+		}
+
+		userTags := ei.N(nc.getTags(user))
+		if !(userTags.M("@"+req.Method).BoolZ() || userTags.M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+
+		templateTags := ei.N(nc.getTags(template))
+		if !(templateTags.M("@"+req.Method).BoolZ() || templateTags.M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+
+		res, err := r.Table("users").Get(user).Update(map[string]interface{}{
+			"templates": r.Row.Field("templates").Default(ei.S{}).SetDifference([]string{template}),
+		}).RunWrite(db, r.RunOpts{Durability: "hard"})
+		if err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+		if res.Unchanged == 0 && res.Replaced == 0 {
+			req.Error(ErrInvalidUser, "", nil)
+			return
+		}
+		req.Result(map[string]interface{}{"ok": true})
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
 	}
