@@ -170,7 +170,7 @@ func (nc *NexusConn) BasicAuth(params interface{}) (string, map[string]map[strin
 	if err != nil {
 		return "", nil, ErrInvalidParams
 	}
-	pass, err := ei.N(params).M("pass").Lower().String()
+	pass, err := ei.N(params).M("pass").String()
 	if err != nil {
 		return "", nil, ErrInvalidParams
 	}
