@@ -416,7 +416,12 @@ func (nc *NexusConn) handle() {
 			Log.Debugf("Error on [%s] connection handler: %s", nc.connId, err)
 			break
 		}
-		Log.Printf("[%s@%s] %s: %#v - id: %.0f", req.nc.connId, req.nc.conn.RemoteAddr(), req.Method, req.Params, req.Id)
+		params, err := json.Marshal(req.Params)
+		if err != nil {
+			Log.Printf("[%s@%s] %s: %#v - id: %.0f", req.nc.connId, req.nc.conn.RemoteAddr(), req.Method, req.Params, req.Id)
+		} else {
+			Log.Printf("[%s@%s] %s: %s - id: %.0f", req.nc.connId, req.nc.conn.RemoteAddr(), req.Method, params, req.Id)
+		}
 		if (req.Jsonrpc != "2.0" && req.Jsonrpc != "") || req.Method == "" { //"jsonrpc":"2.0" is optional
 			req.Error(ErrInvalidRequest, "", nil)
 			continue
