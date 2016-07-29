@@ -279,6 +279,37 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			return
 		}
 		req.Result(map[string]interface{}{"ok": true})
+
+	case "user.listTemplate":
+		user, err := ei.N(req.Params).M("user").Lower().String()
+
+		userTags := ei.N(nc.getTags(user))
+		if !(userTags.M("@"+req.Method).BoolZ() || userTags.M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+
+		type udt struct {
+			Templates []string `gorethink:"templates"`
+		}
+
+		res, err := r.Table("users").Get(user).Pluck("templates").Run(db)
+		if err != nil {
+			req.Error(ErrInvalidUser, "", nil)
+			return
+		}
+
+		ret := udt{Templates: []string{}}
+		if err := res.One(&ret); err != nil && err != r.ErrEmptyResult {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+
+		if len(ret.Templates) == 0 {
+			ret.Templates = []string{}
+		}
+		req.Result(ret.Templates)
+
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
 	}
