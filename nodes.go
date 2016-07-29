@@ -1,12 +1,12 @@
 package main
 
 import (
-	"log"
 	"sync/atomic"
 	"time"
 
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
+	. "github.com/jaracil/nexus/log"
 	"github.com/shirou/gopsutil/load"
 )
 
@@ -35,7 +35,7 @@ func nodeTrack() {
 	}
 	_, err := r.Table("nodes").Insert(ndata).RunWrite(db)
 	if err != nil {
-		log.Printf("Error, can't insert on nodes table [%s]", err.Error())
+		Log.Errorf("Error, can't insert on nodes table [%s]", err.Error())
 		return
 	}
 	// WatchDog loop
@@ -57,18 +57,18 @@ func nodeTrack() {
 				Update(info, r.UpdateOpts{ReturnChanges: true}).
 				RunWrite(db)
 			if err != nil {
-				log.Printf("Error, can't update on nodes table [%s]", err.Error())
+				Log.Errorf("Error, can't update on nodes table [%s]", err.Error())
 				exit = true
 				break
 			}
 			if res.Replaced == 0 {
-				log.Printf("Error, cero records updated on nodes table. Record deleted?")
+				Log.Errorf("Error, zero records updated on nodes table. Deleted record?")
 				exit = true
 				break
 			}
 			newNodeData := ei.N(res.Changes[0].NewValue)
 			if newNodeData.M("kill").BoolZ() {
-				log.Printf("Ouch!, I'm killed")
+				Log.Errorf("Ouch!, I've been killed")
 				exit = true
 				break
 			}
@@ -90,7 +90,7 @@ func nodeTrack() {
 					for _, n := range nodesKilled {
 						id := ei.N(n).M("id").StringZ()
 						cleanNode(id)
-						log.Printf("Cleaning node [%s]", id)
+						Log.Printf("Cleaning node [%s]", id)
 					}
 				}
 			}
@@ -102,12 +102,12 @@ func nodeTrack() {
 				if err == nil {
 					if ei.N(firstNode).M("id").StringZ() == nodeId {
 						if !isMasterNode() {
-							log.Printf("Now I'm master node")
+							Log.Printf("I'm the master node now")
 							setMasterNode(true)
 						}
 					} else {
 						if isMasterNode() {
-							log.Printf("Now I'm not master node")
+							Log.Printf("I'm NOT the master node anymore")
 							setMasterNode(false)
 						}
 					}
@@ -129,7 +129,7 @@ func cleanNode(node string) {
 	if err == nil {
 		r.Table("nodes").Get(node).Delete().RunWrite(db)
 	} else {
-		log.Printf("Error cleaning node [%s]: %s", node, err)
+		Log.Errorf("Error cleaning node [%s]: %s", node, err)
 	}
 }
 

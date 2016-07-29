@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"sync/atomic"
@@ -13,6 +12,7 @@ import (
 
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
+	. "github.com/jaracil/nexus/log"
 	"github.com/jaracil/nxcli/nxcore"
 	"github.com/jaracil/smartio"
 	"golang.org/x/net/context"
@@ -203,7 +203,7 @@ func (nc *NexusConn) respWorker() {
 	defer nc.close()
 	trackCh, err := sesNotify.Register(nc.connId, make(chan interface{}, 1024))
 	if err != nil { // Duplicated session ???
-		log.Printf("Error on [%s] respworker: %s", nc.connId, err)
+		Log.Warnf("Error on [%s] respWorker: %s", nc.connId, err)
 		return
 	}
 	defer sesNotify.Unregister(nc.connId)
@@ -235,7 +235,7 @@ func (nc *NexusConn) respWorker() {
 					nc.reload(false)
 				}
 				if res.Kick {
-					log.Printf("Connection [%s] has been kicked!", nc.connId)
+					Log.Printf("Connection [%s] has been kicked!", nc.connId)
 					nc.close()
 				}
 			}
@@ -252,7 +252,7 @@ func (nc *NexusConn) sendWorker() {
 	for {
 		res, err := nc.pullRes()
 		if err != nil {
-			log.Print("error on sendWorker:", err)
+			Log.Debugf("Error on [%s] sendWorker: %s", nc.connId, err)
 			break
 		}
 		if res.Id == nil {
@@ -271,17 +271,17 @@ func (nc *NexusConn) sendWorker() {
 		}
 		buf, err := json.Marshal(res)
 		if err != nil {
-			log.Print("Marshal error: ", err)
+			Log.Debugf("[%s] connection marshal error: %s", nc.connId, err)
 			break
 		}
 		buf = append(buf, byte('\r'), byte('\n'))
 		n, err := nc.connTx.Write(buf)
 		if err != nil || n != len(buf) {
-			log.Print("Connection write error: ", err)
+			Log.Debugf("[%s] connection write error: %s", nc.connId, err)
 			break
 		}
 	}
-	log.Print("exit from sendWorker")
+	Log.Debugf("Exit from [%s] sendWorker", nc.connId)
 }
 
 func (nc *NexusConn) recvWorker() {
@@ -305,11 +305,11 @@ func (nc *NexusConn) recvWorker() {
 		}
 		err = nc.pushReq(req)
 		if err != nil {
-			log.Print("error on recvWorker:", err)
+			Log.Debugf("Error on [%s] recvWorker: %s", nc.connId, err)
 			break
 		}
 	}
-	log.Print("exit from recvWorker")
+	Log.Debugf("Exit from [%s] recvWorker", nc.connId)
 }
 
 func (nc *NexusConn) watchdog() {
@@ -324,7 +324,7 @@ func (nc *NexusConn) watchdog() {
 			if (now-nc.connRx.GetLast() > max) &&
 				(now-nc.connTx.GetLast() > max) {
 				exit = true
-				log.Printf("Connection [%s] watch dog expired!", nc.connId)
+				Log.Warnf("Connection [%s] watch dog expired!", nc.connId)
 			}
 
 			nc.updateSession()
@@ -341,7 +341,7 @@ func (nc *NexusConn) close() {
 		nc.cancelFun()
 		nc.conn.Close()
 		if mainContext.Err() == nil {
-			log.Printf("Close %s session\r\n", nc.connId)
+			Log.Printf("Closing [%s] session", nc.connId)
 			dbClean(nc.connId)
 		}
 	}
@@ -366,9 +366,9 @@ func (nc *NexusConn) reload(fromSameSession bool) (bool, int) {
 		if err != nil || wres.Replaced == 0 {
 			return false, ErrInternal
 		}
-		log.Printf("Connection [%s] reloaded by other session", nc.connId)
+		Log.Printf("Connection [%s] reloaded by other session", nc.connId)
 	} else {
-		log.Printf("Connection [%s] reloaded by itself", nc.connId)
+		Log.Printf("Connection [%s] reloaded by itself", nc.connId)
 	}
 	return true, 0
 }
@@ -388,7 +388,7 @@ func (nc *NexusConn) updateSession() {
 		RunWrite(db)
 
 	if err != nil {
-		log.Println("Error updating session", nc.connId, ":", err)
+		Log.Errorf("Error updating session [%s]: %s", nc.connId, err)
 		nc.close()
 	}
 }
@@ -413,10 +413,10 @@ func (nc *NexusConn) handle() {
 	for {
 		req, err := nc.pullReq()
 		if err != nil {
-			log.Print("error on handle:", err)
+			Log.Debugf("Error on [%s] connection handler: %s", nc.connId, err)
 			break
 		}
-		log.Printf("Recibida instruccion jsonrpc: %+v", req)
+		Log.Printf("[%s@%s] %s: %#v - id: %.0f", req.nc.connId, req.nc.conn.RemoteAddr(), req.Method, req.Params, req.Id)
 		if (req.Jsonrpc != "2.0" && req.Jsonrpc != "") || req.Method == "" { //"jsonrpc":"2.0" is optional
 			req.Error(ErrInvalidRequest, "", nil)
 			continue

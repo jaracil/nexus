@@ -1,12 +1,12 @@
 package main
 
 import (
-	"log"
 	"strings"
 	"time"
 
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
+	. "github.com/jaracil/nexus/log"
 )
 
 type Task struct {
@@ -72,7 +72,7 @@ func taskTrack() {
 			Pluck(ei.M{"new_val": []string{"id", "stat", "localId", "detach", "user", "prio", "ttl", "path", "method", "result", "errCode", "errStr", "errObj"}}).
 			Run(db)
 		if err != nil {
-			log.Printf("Error opening taskTrack iterator:%s\n", err.Error())
+			Log.Errorln("Error opening taskTrack iterator:", err.Error())
 			time.Sleep(time.Second)
 			continue
 		}
@@ -80,7 +80,7 @@ func taskTrack() {
 		for {
 			tf := &TaskFeed{}
 			if !iter.Next(tf) {
-				log.Printf("Error processing feed: %s\n", iter.Err().Error())
+				Log.Printf("Error processing taskTrack feed:", iter.Err().Error())
 				iter.Close()
 				break
 			}

@@ -1,11 +1,11 @@
 package main
 
 import (
-	"log"
 	"time"
 
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
+	. "github.com/jaracil/nexus/log"
 )
 
 type Session struct {
@@ -30,7 +30,7 @@ func sessionTrack() {
 				"old_val": []string{"id"}}).
 			Run(db)
 		if err != nil {
-			log.Printf("Error opening sessionTrack iterator:%s\n", err.Error())
+			Log.Errorf("Error opening sessionTrack iterator:%s", err.Error())
 			time.Sleep(time.Second)
 			continue
 		}
@@ -38,7 +38,7 @@ func sessionTrack() {
 		for {
 			sf := &SessionFeed{}
 			if !iter.Next(sf) {
-				log.Printf("Error processing feed: %s\n", iter.Err().Error())
+				Log.Errorf("Error processing sessionTrack feed: %s", iter.Err().Error())
 				iter.Close()
 				break
 			}
@@ -127,7 +127,7 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 			return
 		}
 
-		log.Printf("Session [%s] is %sing session [%s] from user [%s]\n", nc.connId, action, prefix, user)
+		Log.Printf("Session [%s] is %sing session [%s] from user [%s]\n", nc.connId, action, prefix, user)
 
 		res, err := r.Table("sessions").
 			Between(prefix, prefix+"\uffff").

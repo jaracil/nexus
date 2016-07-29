@@ -1,12 +1,12 @@
 package main
 
 import (
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	. "github.com/jaracil/nexus/log"
 	"golang.org/x/net/context"
 )
 
@@ -14,7 +14,7 @@ var (
 	nodeId        string
 	mainContext   context.Context
 	mainCancel    context.CancelFunc
-	sesNotify     *Notifyer      = NewNotifyer()
+	sesNotify     *Notifier      = NewNotifier()
 	sigChan       chan os.Signal = make(chan os.Signal, 1)
 	listenContext context.Context
 	listenCancel  context.CancelFunc
@@ -25,7 +25,7 @@ func signalManager() {
 		switch s {
 		case syscall.SIGINT:
 			if listenContext.Err() == nil {
-				log.Println("Stopping new connections")
+				Log.Println("Stopping new connections")
 				listenCancel()
 				go func() {
 					for numconn > 0 {
@@ -53,7 +53,7 @@ func signalManager() {
 
 func exit(cause string) {
 	if mainContext.Err() == nil {
-		println("Daemon exit, cause: ", cause)
+		Log.Errorln("Daemon exit. Cause:", cause)
 		mainCancel()
 	}
 }
@@ -67,7 +67,7 @@ func main() {
 	mainContext, mainCancel = context.WithCancel(context.Background())
 	err := dbOpen()
 	if err != nil {
-		log.Fatal("Error opening rethinkdb connection:", err)
+		Log.Fatal("Error opening RethinkDB connection:", err)
 	}
 	defer db.Close()
 
@@ -79,11 +79,11 @@ func main() {
 
 	listen()
 
-	log.Printf("Start Daemon, Node ID:%s\r\n", nodeId)
+	Log.Printf("Nexus node [%s] started", nodeId)
 	<-mainContext.Done()
 	cleanNode(nodeId)
 	for numconn > 0 {
 		time.Sleep(time.Second)
 	}
-	log.Printf("Stop Daemon, Node ID:%s\r\n", nodeId)
+	Log.Printf("Nexus node [%s] stopped", nodeId)
 }
