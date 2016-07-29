@@ -20,7 +20,7 @@ func (nc *NexusConn) handleSyncReq(req *JsonRpcReq) {
 		}
 		res, err := r.Table("locks").
 			Insert(ei.M{"id": lock, "owner": nc.connId}).
-			RunWrite(db, r.RunOpts{Durability: "soft"})
+			RunWrite(db, r.RunOpts{Durability: "hard"})
 		if err != nil {
 			if r.IsConflictErr(err) {
 				req.Result(ei.M{"ok": false})
@@ -45,7 +45,7 @@ func (nc *NexusConn) handleSyncReq(req *JsonRpcReq) {
 			GetAll(lock).
 			Filter(r.Row.Field("owner").Eq(nc.connId)).
 			Delete().
-			RunWrite(db, r.RunOpts{Durability: "soft"})
+			RunWrite(db, r.RunOpts{Durability: "hard"})
 
 		if err != nil {
 			req.Error(ErrInternal, err.Error(), nil)

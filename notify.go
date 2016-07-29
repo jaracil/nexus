@@ -11,37 +11,41 @@ type nPoint struct {
 	drops int64
 }
 
-type Notifyer struct {
+var ERROR_KEY_EXISTS = errors.New("Key already exists")
+var ERROR_KEY_NOT_EXISTS = errors.New("Key doesn't exist")
+var ERROR_OVERFLOW = errors.New("Overflow")
+
+type Notifier struct {
 	sync.RWMutex
 	m map[string]*nPoint
 }
 
-func NewNotifyer() *Notifyer {
-	return &Notifyer{m: make(map[string]*nPoint)}
+func NewNotifier() *Notifier {
+	return &Notifier{m: make(map[string]*nPoint)}
 }
 
-func (nt *Notifyer) Register(key string, ch chan interface{}) (chan interface{}, error) {
+func (nt *Notifier) Register(key string, ch chan interface{}) (chan interface{}, error) {
 	nt.Lock()
 	defer nt.Unlock()
 	if _, ok := nt.m[key]; ok {
-		return ch, errors.New("Key already exists")
+		return ch, ERROR_KEY_EXISTS
 	}
 	nt.m[key] = &nPoint{ch: ch}
 	return ch, nil
 }
 
-func (nt *Notifyer) Unregister(key string) error {
+func (nt *Notifier) Unregister(key string) error {
 	nt.Lock()
 	defer nt.Unlock()
 	if _, ok := nt.m[key]; !ok {
-		return errors.New("Key not exists")
+		return ERROR_KEY_NOT_EXISTS
 	}
 	close(nt.m[key].ch)
 	delete(nt.m, key)
 	return nil
 }
 
-func (nt *Notifyer) Notify(key string, d interface{}) error {
+func (nt *Notifier) Notify(key string, d interface{}) error {
 	nt.RLock()
 	defer nt.RUnlock()
 	np, ok := nt.m[key]
@@ -50,23 +54,23 @@ func (nt *Notifyer) Notify(key string, d interface{}) error {
 		case np.ch <- d:
 		default:
 			atomic.AddInt64(&np.drops, 1)
-			return errors.New("Overflow")
+			return ERROR_OVERFLOW
 		}
 	}
-	return errors.New("Key not exists")
+	return ERROR_KEY_NOT_EXISTS
 }
 
-func (nt *Notifyer) Channel(key string) (chan interface{}, error) {
+func (nt *Notifier) Channel(key string) (chan interface{}, error) {
 	nt.RLock()
 	defer nt.RUnlock()
 	np, ok := nt.m[key]
 	if ok {
 		return np.ch, nil
 	}
-	return nil, errors.New("Key not exists")
+	return nil, ERROR_KEY_NOT_EXISTS
 }
 
-func (nt *Notifyer) Drops(key string, reset bool) (int, error) {
+func (nt *Notifier) Drops(key string, reset bool) (int, error) {
 	nt.RLock()
 	defer nt.RUnlock()
 	np, ok := nt.m[key]
@@ -79,20 +83,20 @@ func (nt *Notifyer) Drops(key string, reset bool) (int, error) {
 		}
 		return int(drops), nil
 	}
-	return 0, errors.New("Key not exists")
+	return 0, ERROR_KEY_NOT_EXISTS
 }
 
-func (nt *Notifyer) Waiting(key string) (int, error) {
+func (nt *Notifier) Waiting(key string) (int, error) {
 	nt.RLock()
 	defer nt.RUnlock()
 	np, ok := nt.m[key]
 	if ok {
 		return len(np.ch), nil
 	}
-	return 0, errors.New("Key not exists")
+	return 0, ERROR_KEY_NOT_EXISTS
 }
 
-func (nt *Notifyer) Purge(key string, n int) (int, error) {
+func (nt *Notifier) Purge(key string, n int) (int, error) {
 	nt.RLock()
 	defer nt.RUnlock()
 	purged := 0
@@ -111,5 +115,5 @@ func (nt *Notifyer) Purge(key string, n int) (int, error) {
 			}
 		}
 	}
-	return 0, errors.New("Key not exists")
+	return 0, ERROR_KEY_NOT_EXISTS
 }

@@ -37,7 +37,7 @@ func (nc *NexusConn) handleTopicReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidParams, "pipeid", nil)
 			return
 		}
-		topic, err := ei.N(req.Params).M("topic").String()
+		topic, err := ei.N(req.Params).M("topic").Lower().String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "topic", nil)
 			return
@@ -54,7 +54,7 @@ func (nc *NexusConn) handleTopicReq(req *JsonRpcReq) {
 				"ismsg": false,
 				"msg":   nil,
 			}).
-			RunWrite(db, r.RunOpts{Durability: "soft"})
+			RunWrite(db, r.RunOpts{Durability: "hard"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
@@ -70,7 +70,7 @@ func (nc *NexusConn) handleTopicReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidParams, "pipeid", nil)
 			return
 		}
-		topic, err := ei.N(req.Params).M("topic").String()
+		topic, err := ei.N(req.Params).M("topic").Lower().String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "topic", nil)
 			return
@@ -87,7 +87,7 @@ func (nc *NexusConn) handleTopicReq(req *JsonRpcReq) {
 				"ismsg": false,
 				"msg":   nil,
 			}).
-			RunWrite(db, r.RunOpts{Durability: "soft"})
+			RunWrite(db, r.RunOpts{Durability: "hard"})
 		if err != nil {
 			req.Error(ErrInternal, err.Error(), nil)
 			return
@@ -99,7 +99,7 @@ func (nc *NexusConn) handleTopicReq(req *JsonRpcReq) {
 		req.Result(map[string]interface{}{"ok": true})
 
 	case "topic.pub":
-		topic, err := ei.N(req.Params).M("topic").String()
+		topic, err := ei.N(req.Params).M("topic").Lower().String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "topic", nil)
 			return

@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
 
 	"github.com/jaracil/ei"
+	. "github.com/jaracil/nexus/log"
+	"github.com/tylerb/graceful"
+	"golang.org/x/net/context"
 	"golang.org/x/net/websocket"
 )
 
@@ -19,7 +21,7 @@ type httpwsHandler struct{}
 func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	if req.TLS == nil {
-		log.Printf("[WARN] Unencrypted connection from %s!!\n", req.RemoteAddr)
+		Log.Warnf("Unencrypted connection from %s!", req.RemoteAddr)
 	}
 
 	if headerContains(req.Header["Connection"], "Upgrade") {
@@ -29,8 +31,20 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 			wsrv := &websocket.Server{}
 			wsrv.Handler = func(ws *websocket.Conn) {
-				log.Print("WebSocket connection from: ", req.RemoteAddr)
-				NewNexusConn(ws).handle()
+				if u, err := url.Parse(req.RemoteAddr); err != nil {
+					ws.Config().Origin, _ = url.Parse("0.0.0.0:1234")
+				} else {
+					ws.Config().Origin = u
+				}
+				Log.Println("WebSocket connection from:", ws.RemoteAddr())
+
+				nc := NewNexusConn(ws)
+				if req.TLS != nil {
+					nc.proto = "wss"
+				} else {
+					nc.proto = "ws"
+				}
+				nc.handle()
 			}
 			if wsrv.Header == nil {
 				wsrv.Header = make(map[string][]string)
@@ -40,7 +54,7 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 			wsrv.ServeHTTP(res, req)
 
 		} else {
-			log.Printf("Connection dropped for requesting an upgrade to an unsupported protocol: %v\n", req.Header["Upgrade"])
+			Log.Warnf("Connection dropped for requesting an upgrade to an unsupported protocol: %v", req.Header["Upgrade"])
 			res.WriteHeader(http.StatusBadRequest)
 		}
 
@@ -50,6 +64,11 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		netCli, netSrv := net.Pipe()
 		netCliBuf := bufio.NewReader(netCli)
 		ns := NewNexusConn(netSrv)
+		if req.TLS != nil {
+			ns.proto = "https"
+		} else {
+			ns.proto = "http"
+		}
 		defer ns.close()
 		defer netCli.Close()
 		go ns.handle()
@@ -90,30 +109,49 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func httpListener(u *url.URL) {
-	defer exit("http listener goroutine error")
+func httpListener(u *url.URL, ctx context.Context) {
+	defer Log.Println("Listener", u, "finished")
+	server := graceful.Server{
+		Server:  &http.Server{Addr: u.Host, Handler: http.Handler(&httpwsHandler{})},
+		Timeout: 0,
+	}
 
-	handler := http.Handler(&httpwsHandler{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			server.Stop(0)
+		}
+	}()
 
-	log.Println("Listening HTTP  at:", u.Host)
-	err := http.ListenAndServe(u.Host, handler)
-	if err != nil {
-		log.Println("HTTP listener error: " + err.Error())
-		mainCancel()
+	Log.Println("Listening on", u)
+	err := server.ListenAndServe()
+	if err != nil && ctx.Err() == nil {
+		Log.Errorln("HTTP listener error:", err.Error())
+		exit("http listener goroutine error")
 		return
 	}
 }
 
-func httpsListener(u *url.URL) {
-	defer exit("https listener goroutine error")
+func httpsListener(u *url.URL, ctx context.Context) {
+	defer Log.Println("Listener", u, "finished")
 
-	handler := http.Handler(&httpwsHandler{})
+	server := graceful.Server{
+		Server:  &http.Server{Addr: u.Host, Handler: http.Handler(&httpwsHandler{})},
+		Timeout: 0,
+	}
 
-	log.Println("Listening HTTPS at:", u.Host)
-	err := http.ListenAndServeTLS(u.Host, opts.SSL.Cert, opts.SSL.Key, handler)
-	if err != nil {
-		log.Println("HTTPS listener error: " + err.Error())
-		mainCancel()
+	go func() {
+		select {
+		case <-ctx.Done():
+			server.Stop(0)
+		}
+	}()
+
+	Log.Println("Listening on", u)
+	err := server.ListenAndServeTLS(opts.SSL.Cert, opts.SSL.Key)
+	if err != nil && ctx.Err() == nil {
+		Log.Errorln("HTTPS listener error:", err.Error())
+		exit("https listener goroutine error")
 		return
 	}
 }

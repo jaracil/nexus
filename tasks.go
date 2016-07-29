@@ -1,12 +1,12 @@
 package main
 
 import (
-	"log"
 	"strings"
 	"time"
 
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
+	. "github.com/jaracil/nexus/log"
 )
 
 type Task struct {
@@ -72,7 +72,7 @@ func taskTrack() {
 			Pluck(ei.M{"new_val": []string{"id", "stat", "localId", "detach", "user", "prio", "ttl", "path", "method", "result", "errCode", "errStr", "errObj"}}).
 			Run(db)
 		if err != nil {
-			log.Printf("Error opening taskTrack iterator:%s\n", err.Error())
+			Log.Errorln("Error opening taskTrack iterator:", err.Error())
 			time.Sleep(time.Second)
 			continue
 		}
@@ -80,7 +80,7 @@ func taskTrack() {
 		for {
 			tf := &TaskFeed{}
 			if !iter.Next(tf) {
-				log.Printf("Error processing feed: %s\n", iter.Err().Error())
+				Log.Printf("Error processing taskTrack feed:", iter.Err().Error())
 				iter.Close()
 				break
 			}
@@ -204,7 +204,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 	var null *int
 	switch req.Method {
 	case "task.push":
-		method, err := ei.N(req.Params).M("method").String()
+		method, err := ei.N(req.Params).M("method").Lower().String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "method", nil)
 			return
@@ -257,7 +257,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		if req.Id == nil {
 			return
 		}
-		prefix := ei.N(req.Params).M("prefix").StringZ()
+		prefix := ei.N(req.Params).M("prefix").Lower().StringZ()
 		if prefix == "" {
 			req.Error(ErrInvalidParams, "prefix", nil)
 			return
@@ -363,6 +363,55 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidTask, "", nil)
 		}
 
+	case "task.list":
+		prefix, err := ei.N(req.Params).M("prefix").Lower().String()
+		if err != nil {
+			req.Error(ErrInvalidParams, "prefix", nil)
+			return
+		}
+		limit, err := ei.N(req.Params).M("limit").Int()
+		if err != nil {
+			limit = 100
+		}
+		skip, err := ei.N(req.Params).M("skip").Int()
+		if err != nil {
+			skip = 0
+		}
+		tags := nc.getTags(prefix)
+		if !(ei.N(tags).M("@task.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+		term := r.Table("tasks").Pluck("path")
+
+		if skip >= 0 {
+			term = term.Skip(skip)
+		}
+
+		if limit >= 0 {
+			term = term.Limit(limit)
+		}
+
+		cur, err := term.Run(db)
+		if err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+		pulls := make(map[string]int)
+		pushs := make(map[string]int)
+		var task Task
+		for cur.Next(&task) {
+			if strings.HasPrefix(task.Path, "@pull."+prefix) {
+				p := strings.TrimPrefix(task.Path, "@pull.")
+				pulls[p]++
+			} else if strings.HasPrefix(task.Path, prefix) {
+				pushs[task.Path]++
+			}
+		}
+		ret := make(map[string]interface{})
+		ret["pulls"] = pulls
+		ret["pushes"] = pushs
+		req.Result(ret)
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
 	}

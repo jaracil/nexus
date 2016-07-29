@@ -4,12 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
+	r "github.com/dancannon/gorethink"
+	"github.com/jaracil/ei"
+	. "github.com/jaracil/nexus/log"
+	"github.com/jaracil/nxcli/nxcore"
 	"github.com/jaracil/smartio"
 	"golang.org/x/net/context"
 )
@@ -37,6 +41,7 @@ type JsonRpcRes struct {
 
 type NexusConn struct {
 	conn      net.Conn
+	proto     string
 	connRx    *smartio.SmartReader
 	connTx    *smartio.SmartWriter
 	connId    string
@@ -52,6 +57,7 @@ type NexusConn struct {
 func NewNexusConn(conn net.Conn) *NexusConn {
 	nc := &NexusConn{
 		conn:   conn,
+		proto:  "unknown",
 		connRx: smartio.NewSmartReader(conn),
 		connTx: smartio.NewSmartWriter(conn),
 		connId: nodeId + safeId(4),
@@ -62,6 +68,24 @@ func NewNexusConn(conn net.Conn) *NexusConn {
 	}
 	nc.context, nc.cancelFun = context.WithCancel(mainContext)
 	return nc
+}
+
+func NewInternalClient() *nxcore.NexusConn {
+	client, server := net.Pipe()
+
+	nc := NewNexusConn(server)
+	nc.proto = "internal"
+	nc.user = &UserData{
+		User: "@internal",
+		Tags: map[string]map[string]interface{}{
+			".": map[string]interface{}{
+				"@admin": true,
+			},
+		},
+	}
+	go nc.handle()
+
+	return nxcore.NewNexusConn(client)
 }
 
 func (req *JsonRpcReq) Error(code int, message string, data interface{}) {
@@ -125,14 +149,14 @@ func (nc *NexusConn) pullReq() (req *JsonRpcReq, err error) {
 	return
 }
 
-func (nc *NexusConn) getTags(prefix string) (tags map[string]interface{}) {
+func getTags(ud *UserData, prefix string) (tags map[string]interface{}) {
 	tags = map[string]interface{}{}
-	if nc.user == nil || nc.user.Tags == nil {
+	if ud == nil || ud.Tags == nil {
 		return
 	}
 	pfs := prefixes(prefix)
 	for _, pf := range pfs {
-		if tm, ok := nc.user.Tags[pf]; ok {
+		if tm, ok := ud.Tags[pf]; ok {
 			for k, v := range tm {
 				tags[k] = v
 			}
@@ -141,13 +165,24 @@ func (nc *NexusConn) getTags(prefix string) (tags map[string]interface{}) {
 	return
 }
 
+func (nc *NexusConn) getTags(prefix string) (tags map[string]interface{}) {
+	return getTags(nc.user, prefix)
+}
+
 func (nc *NexusConn) handleReq(req *JsonRpcReq) {
 	if req.Id == nil {
 		return
 	}
 	switch {
 	case strings.HasPrefix(req.Method, "sys."):
-		nc.handleSysReq(req)
+		switch {
+		case strings.HasPrefix(req.Method, "sys.node."):
+			nc.handleNodesReq(req)
+		case strings.HasPrefix(req.Method, "sys.session."):
+			nc.handleSessionReq(req)
+		default:
+			nc.handleSysReq(req)
+		}
 	case strings.HasPrefix(req.Method, "task."):
 		nc.handleTaskReq(req)
 	case strings.HasPrefix(req.Method, "pipe."):
@@ -158,6 +193,7 @@ func (nc *NexusConn) handleReq(req *JsonRpcReq) {
 		nc.handleUserReq(req)
 	case strings.HasPrefix(req.Method, "sync."):
 		nc.handleSyncReq(req)
+
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
 	}
@@ -167,28 +203,43 @@ func (nc *NexusConn) respWorker() {
 	defer nc.close()
 	trackCh, err := sesNotify.Register(nc.connId, make(chan interface{}, 1024))
 	if err != nil { // Duplicated session ???
+		Log.Warnf("Error on [%s] respWorker: %s", nc.connId, err)
 		return
 	}
 	defer sesNotify.Unregister(nc.connId)
 	for {
 		select {
 		case d := <-trackCh:
-			resTask := d.(*Task)
-			if resTask.ErrCode != nil {
-				nc.pushRes(
-					&JsonRpcRes{
-						Id:    resTask.LocalId,
-						Error: &JsonRpcErr{Code: *resTask.ErrCode, Message: resTask.ErrStr, Data: resTask.ErrObj},
-					},
-				)
-			} else {
-				nc.pushRes(
-					&JsonRpcRes{
-						Id:     resTask.LocalId,
-						Result: resTask.Result,
-					},
-				)
+
+			switch res := d.(type) {
+
+			case *Task:
+				if res.ErrCode != nil {
+					nc.pushRes(
+						&JsonRpcRes{
+							Id:    res.LocalId,
+							Error: &JsonRpcErr{Code: *res.ErrCode, Message: res.ErrStr, Data: res.ErrObj},
+						},
+					)
+				} else {
+					nc.pushRes(
+						&JsonRpcRes{
+							Id:     res.LocalId,
+							Result: res.Result,
+						},
+					)
+				}
+
+			case *Session:
+				if res.Reload {
+					nc.reload(false)
+				}
+				if res.Kick {
+					Log.Printf("Connection [%s] has been kicked!", nc.connId)
+					nc.close()
+				}
 			}
+
 		case <-nc.context.Done():
 			return
 		}
@@ -201,7 +252,7 @@ func (nc *NexusConn) sendWorker() {
 	for {
 		res, err := nc.pullRes()
 		if err != nil {
-			log.Print("error on sendWorker:", err)
+			Log.Debugf("Error on [%s] sendWorker: %s", nc.connId, err)
 			break
 		}
 		if res.Id == nil {
@@ -220,17 +271,17 @@ func (nc *NexusConn) sendWorker() {
 		}
 		buf, err := json.Marshal(res)
 		if err != nil {
-			log.Print("Marshal error: ", err)
+			Log.Debugf("[%s] connection marshal error: %s", nc.connId, err)
 			break
 		}
 		buf = append(buf, byte('\r'), byte('\n'))
 		n, err := nc.connTx.Write(buf)
 		if err != nil || n != len(buf) {
-			log.Print("Connection write error: ", err)
+			Log.Debugf("[%s] connection write error: %s", nc.connId, err)
 			break
 		}
 	}
-	log.Print("exit from sendWorker")
+	Log.Debugf("Exit from [%s] sendWorker", nc.connId)
 }
 
 func (nc *NexusConn) recvWorker() {
@@ -254,11 +305,11 @@ func (nc *NexusConn) recvWorker() {
 		}
 		err = nc.pushReq(req)
 		if err != nil {
-			log.Print("error on recvWorker:", err)
+			Log.Debugf("Error on [%s] recvWorker: %s", nc.connId, err)
 			break
 		}
 	}
-	log.Print("exit from recvWorker")
+	Log.Debugf("Exit from [%s] recvWorker", nc.connId)
 }
 
 func (nc *NexusConn) watchdog() {
@@ -273,8 +324,10 @@ func (nc *NexusConn) watchdog() {
 			if (now-nc.connRx.GetLast() > max) &&
 				(now-nc.connTx.GetLast() > max) {
 				exit = true
-				log.Printf("Connection [%s] watch dog expired!", nc.connId)
+				Log.Warnf("Connection [%s] watch dog expired!", nc.connId)
 			}
+
+			nc.updateSession()
 
 		case <-nc.context.Done():
 			exit = true
@@ -288,25 +341,87 @@ func (nc *NexusConn) close() {
 		nc.cancelFun()
 		nc.conn.Close()
 		if mainContext.Err() == nil {
-			log.Printf("Close %s session\r\n", nc.connId)
+			Log.Printf("Closing [%s] session", nc.connId)
 			dbClean(nc.connId)
 		}
 	}
 }
 
+func (nc *NexusConn) reload(fromSameSession bool) (bool, int) {
+	if nc.user == nil {
+		return false, ErrInvalidRequest
+	}
+	ud, err := loadUserData(nc.user.User)
+	if err != ErrNoError {
+		return false, ErrInternal
+	}
+
+	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(&UserData{User: ud.User, Mask: ud.Mask, Tags: maskTags(ud.Tags, ud.Mask)}))
+
+	if !fromSameSession {
+		wres, err := r.Table("sessions").
+			Between(nc.connId, nc.connId+"\uffff").
+			Update(ei.M{"reload": false}).
+			RunWrite(db)
+		if err != nil || wres.Replaced == 0 {
+			return false, ErrInternal
+		}
+		Log.Printf("Connection [%s] reloaded by other session", nc.connId)
+	} else {
+		Log.Printf("Connection [%s] reloaded by itself", nc.connId)
+	}
+	return true, 0
+}
+
+func (nc *NexusConn) updateSession() {
+	_, err := r.Table("sessions").
+		Get(nc.connId).
+		Replace(ei.M{
+			"id":            nc.connId,
+			"nodeId":        nodeId,
+			"creationTime":  r.Row.Field("creationTime").Default(r.Now()),
+			"lastSeen":      r.Now(),
+			"remoteAddress": nc.conn.RemoteAddr().String(),
+			"protocol":      nc.proto,
+			"user":          nc.user.User,
+		}).
+		RunWrite(db)
+
+	if err != nil {
+		Log.Errorf("Error updating session [%s]: %s", nc.connId, err)
+		nc.close()
+	}
+}
+
+var numconn int64
+
 func (nc *NexusConn) handle() {
+
+	if nc.proto != "internal" {
+		atomic.AddInt64(&numconn, 1)
+		defer func() { atomic.AddInt64(&numconn, -1) }()
+	}
+
 	defer nc.close()
 	go nc.respWorker()
 	go nc.sendWorker()
 	go nc.recvWorker()
 	go nc.watchdog()
+
+	nc.updateSession()
+
 	for {
 		req, err := nc.pullReq()
 		if err != nil {
-			log.Print("error on handle:", err)
+			Log.Debugf("Error on [%s] connection handler: %s", nc.connId, err)
 			break
 		}
-		log.Printf("Recibida instruccion jsonrpc: %+v", req)
+		params, err := json.Marshal(req.Params)
+		if err != nil {
+			Log.Printf("[%s@%s] %s: %#v - id: %.0f", req.nc.connId, req.nc.conn.RemoteAddr(), req.Method, req.Params, req.Id)
+		} else {
+			Log.Printf("[%s@%s] %s: %s - id: %.0f", req.nc.connId, req.nc.conn.RemoteAddr(), req.Method, params, req.Id)
+		}
 		if (req.Jsonrpc != "2.0" && req.Jsonrpc != "") || req.Method == "" { //"jsonrpc":"2.0" is optional
 			req.Error(ErrInvalidRequest, "", nil)
 			continue

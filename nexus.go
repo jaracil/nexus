@@ -1,31 +1,51 @@
 package main
 
 import (
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	. "github.com/jaracil/nexus/log"
 	"golang.org/x/net/context"
 )
 
 var (
-	nodeId      string
-	mainContext context.Context
-	mainCancel  context.CancelFunc
-	sesNotify   *Notifyer      = NewNotifyer()
-	sigChan     chan os.Signal = make(chan os.Signal, 1)
+	nodeId        string
+	mainContext   context.Context
+	mainCancel    context.CancelFunc
+	sesNotify     *Notifier      = NewNotifier()
+	sigChan       chan os.Signal = make(chan os.Signal, 1)
+	listenContext context.Context
+	listenCancel  context.CancelFunc
 )
 
 func signalManager() {
 	for s := range sigChan {
 		switch s {
 		case syscall.SIGINT:
-			exit("system INT signal")
+			if listenContext.Err() == nil {
+				Log.Println("Stopping new connections")
+				listenCancel()
+				go func() {
+					for numconn > 0 {
+						time.Sleep(time.Second)
+					}
+					exit("there is no connection left")
+				}()
+			} else {
+				exit("system INT signal")
+			}
 		case syscall.SIGTERM:
 			exit("system TERM signal")
 		case syscall.SIGKILL:
 			exit("system KILL signal")
+		case syscall.SIGUSR1:
+			listenCancel()
+		case syscall.SIGUSR2:
+			if listenContext.Err() != nil {
+				listen()
+			}
 		default:
 		}
 	}
@@ -33,7 +53,7 @@ func signalManager() {
 
 func exit(cause string) {
 	if mainContext.Err() == nil {
-		println("Daemon exit, cause: ", cause)
+		Log.Errorln("Daemon exit. Cause:", cause)
 		mainCancel()
 	}
 }
@@ -47,19 +67,23 @@ func main() {
 	mainContext, mainCancel = context.WithCancel(context.Background())
 	err := dbOpen()
 	if err != nil {
-		log.Fatal("Error opening rethinkdb connection:", err)
+		Log.Fatal("Error opening RethinkDB connection:", err)
 	}
 	defer db.Close()
 
 	go nodeTrack()
 	go taskTrack()
 	go pipeTrack()
+	go sessionTrack()
 	go taskPurge()
 
 	listen()
 
-	log.Printf("Start Daemon, Node ID:%s\r\n", nodeId)
+	Log.Printf("Nexus node [%s] started", nodeId)
 	<-mainContext.Done()
 	cleanNode(nodeId)
-	log.Printf("Stop Daemon, Node ID:%s\r\n", nodeId)
+	for numconn > 0 {
+		time.Sleep(time.Second)
+	}
+	Log.Printf("Nexus node [%s] stopped", nodeId)
 }

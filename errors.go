@@ -14,6 +14,7 @@ const (
 	ErrUserExists       = -32005
 	ErrPermissionDenied = -32010
 	ErrTtlExpired       = -32011
+	ErrNoError          = 0
 )
 
 var ErrStr = map[int]string{

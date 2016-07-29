@@ -80,7 +80,7 @@ func (nc *NexusConn) handlePipeReq(req *JsonRpcReq) {
 			IsMsg:        false,
 			CreationTime: r.Now(),
 		}
-		_, err = r.Table("pipes").Insert(pipe).RunWrite(db, r.RunOpts{Durability: "soft"})
+		_, err = r.Table("pipes").Insert(pipe).RunWrite(db, r.RunOpts{Durability: "hard"})
 		if err != nil {
 			sesNotify.Unregister(pipeid)
 			req.Error(ErrInternal, "", nil)
@@ -94,7 +94,7 @@ func (nc *NexusConn) handlePipeReq(req *JsonRpcReq) {
 			return
 		}
 		sesNotify.Unregister(pipeid)
-		res, err := r.Table("pipes").Get(pipeid).Delete().RunWrite(db, r.RunOpts{Durability: "soft"})
+		res, err := r.Table("pipes").Get(pipeid).Delete().RunWrite(db, r.RunOpts{Durability: "hard"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
