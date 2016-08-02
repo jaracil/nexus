@@ -155,3 +155,28 @@ func httpsListener(u *url.URL, ctx context.Context) {
 		return
 	}
 }
+
+func healthCheckListener(u *url.URL, ctx context.Context) {
+	defer Log.Println("Listener", u, "finished")
+	server := graceful.Server{
+		Server: &http.Server{Addr: u.Host, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(200)
+		})},
+		Timeout: 0,
+	}
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			server.Stop(0)
+		}
+	}()
+
+	Log.Println("Listening on", u)
+	err := server.ListenAndServe()
+	if err != nil && ctx.Err() == nil {
+		Log.Errorln("HealthCheck listener error:", err.Error())
+		exit("healthCheck listener goroutine error")
+		return
+	}
+}

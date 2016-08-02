@@ -1,12 +1,12 @@
 package main
 
 import (
-	"log"
 	"strings"
 	"time"
 
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
+	. "github.com/jaracil/nexus/log"
 )
 
 type Pipe struct {
@@ -33,7 +33,7 @@ func pipeTrack() {
 				"old_val": []string{"id"}}).
 			Run(db)
 		if err != nil {
-			log.Printf("Error opening pipeTrack iterator:%s\n", err.Error())
+			Log.Printf("Error opening pipeTrack iterator: %s", err.Error())
 			time.Sleep(time.Second)
 			continue
 		}
@@ -41,7 +41,7 @@ func pipeTrack() {
 		for {
 			pf := &PipeFeed{}
 			if !iter.Next(pf) {
-				log.Printf("Error processing feed: %s\n", iter.Err().Error())
+				Log.Printf("Error processing pipeTrack feed: %s", iter.Err().Error())
 				iter.Close()
 				break
 			}

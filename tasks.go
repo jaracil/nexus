@@ -80,7 +80,7 @@ func taskTrack() {
 		for {
 			tf := &TaskFeed{}
 			if !iter.Next(tf) {
-				Log.Printf("Error processing taskTrack feed:", iter.Err().Error())
+				Log.Println("Error processing taskTrack feed:", iter.Err().Error())
 				iter.Close()
 				break
 			}

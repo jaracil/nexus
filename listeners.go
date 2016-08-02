@@ -28,6 +28,8 @@ func listeners(ctx context.Context) {
 				go httpListener(u, ctx)
 			case "https":
 				go httpsListener(u, ctx)
+			case "health":
+				go healthCheckListener(u, ctx)
 
 			default:
 				log.Println("Unknown listener: ", u)
