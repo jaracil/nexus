@@ -98,6 +98,7 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 		req.Result(all)
 
 	case "sys.session.kick":
+		fallthrough
 	case "sys.session.reload":
 		action := req.Method[12:]
 		prefix := ei.N(req.Params).M("connId").StringZ()
@@ -127,7 +128,7 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 			return
 		}
 
-		Log.Printf("Session [%s] is %sing session [%s] from user [%s]\n", nc.connId, action, prefix, user)
+		Log.Printf("Session [%s] is %sing session [%s] from user [%s]", nc.connId, action, prefix, user)
 
 		res, err := r.Table("sessions").
 			Between(prefix, prefix+"\uffff").
