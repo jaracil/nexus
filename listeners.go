@@ -1,9 +1,9 @@
 package main
 
 import (
-	"log"
 	"net/url"
 
+	. "github.com/jaracil/nexus/log"
 	"golang.org/x/net/context"
 )
 
@@ -32,13 +32,13 @@ func listeners(ctx context.Context) {
 				go healthCheckListener(u, ctx)
 
 			default:
-				log.Println("Unknown listener: ", u)
+				Log.Errorln("Unknown listener: ", u)
 				mainCancel()
 				return
 			}
 
 		} else {
-			log.Println("Couldn't parse listener:", v)
+			Log.Errorln("Couldn't parse listener:", v)
 			mainCancel()
 			return
 		}

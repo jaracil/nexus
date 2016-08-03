@@ -56,21 +56,19 @@ func tcpListener(u *url.URL, ctx context.Context) {
 	}
 }
 
-func loadCerts(_ *tls.ClientHelloInfo) (*tls.Certificate, error) {
+func sslListener(u *url.URL, ctx context.Context) {
+	defer Log.Println("Listener", u, "finished")
+
+	Log.Debugln("Loading SSL cert/key")
 	cert, err := tls.LoadX509KeyPair(opts.SSL.Cert, opts.SSL.Key)
 	if err != nil {
 		Log.Errorln("Cannot load SSL cert/key:", err)
 		exit("cannot load ssl cert/key")
-		return nil, err
+		return
 	}
-	return &cert, nil
-}
-
-func sslListener(u *url.URL, ctx context.Context) {
-	defer Log.Println("Listener", u, "finished")
 
 	tlsConfig := &tls.Config{}
-	tlsConfig.GetCertificate = loadCerts
+	tlsConfig.Certificates = []tls.Certificate{cert}
 
 	listen, err := tls.Listen("tcp", u.Host, tlsConfig)
 	if err != nil && ctx.Err() == nil {
@@ -80,9 +78,6 @@ func sslListener(u *url.URL, ctx context.Context) {
 	}
 
 	Log.Println("Listening on", u)
-
-	// Server certs get loaded on first request, so we force one here to crash if certs are missing
-	loadCerts(nil)
 
 	go func() {
 		select {
