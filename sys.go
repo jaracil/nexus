@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -11,6 +12,7 @@ import (
 
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
+	. "github.com/jaracil/nexus/log"
 	"github.com/jaracil/nxcli/nxcore"
 )
 
@@ -71,16 +73,24 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 			mask = loginResponse.Tags
 		}
 
+		// Check user limits
+
 		ud, err := loadUserData(user)
 		if err != ErrNoError {
 			req.Error(err, "", nil)
 			return
 		}
 
-		atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(&UserData{User: ud.User, Mask: mask, Tags: maskTags(ud.Tags, mask)}))
+		if !nc.checkUserLimits(ud) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
 
+		// LOGGED IN!
+		atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(&UserData{User: ud.User, Mask: mask, Tags: maskTags(ud.Tags, mask)}))
 		nc.updateSession()
 		req.Result(ei.M{"ok": true, "user": nc.user.User, "connId": nc.connId})
+
 	case "sys.reload":
 		if done, errcode := nc.reload(true); !done {
 			req.Error(errcode, "", nil)
@@ -163,6 +173,43 @@ func mergeTags(src, dst *UserData) {
 			}
 		}
 	}
+}
+
+func (nc *NexusConn) checkUserLimits(ud *UserData) bool {
+	nci := NewInternalClient()
+	defer nci.Close()
+
+	// Max Sessions opened?
+	// soft limit because race condition checking sessions
+	sessions, err := nci.SessionList(ud.User, ud.MaxSessions, 0)
+	if err != nil || (ud.MaxSessions > 0 && len(sessions)+1 >= ud.MaxSessions) {
+		Log.Warnf("User %s has too many sessions opened: %d/%d", ud.User, len(sessions), ud.MaxSessions)
+		return false
+	}
+
+	remoteaddr := nc.conn.RemoteAddr().String()
+
+	// Blacklisted?
+	for _, br := range ud.Blacklist {
+		if match, err := regexp.MatchString(br, remoteaddr); err == nil && match {
+			Log.Warnf("User %s from %s blacklisted by %s", ud.User, remoteaddr, br)
+			return false
+		}
+	}
+
+	// Whitelisted?
+	if len(ud.Whitelist) > 0 {
+		for _, wr := range ud.Whitelist {
+			Log.Warnf("User %s from %s whitelisted by %s", ud.User, remoteaddr, wr)
+			if match, err := regexp.MatchString(wr, remoteaddr); err == nil && match {
+				return true
+			}
+		}
+	} else {
+		return true
+	}
+
+	return false
 }
 
 func (nc *NexusConn) BasicAuth(params interface{}) (string, map[string]map[string]interface{}, int) {

@@ -10,8 +10,13 @@ type UserData struct {
 	Pass      string                            `gorethink:"pass,omitempty"`
 	Salt      string                            `gorethink:"salt,omitempty"`
 	Tags      map[string]map[string]interface{} `gorethink:"tags,omitempty"`
-	Mask      map[string]map[string]interface{} `gorethink:"mask,omitempty"`
 	Templates []string                          `gorethink:"templates,omitempty"`
+
+	// Limits
+	Mask        map[string]map[string]interface{} `gorethink:"mask,omitempty"`
+	MaxSessions int                               `gorethink:"max_sessions,omitempty"`
+	Whitelist   []string                          `gorethink:"whitelist,omitempty"`
+	Blacklist   []string                          `gorethink:"blacklist,omitempty"`
 }
 
 var Nobody *UserData = &UserData{User: "nobody", Tags: map[string]map[string]interface{}{}}
@@ -34,7 +39,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		ud := UserData{User: user, Salt: safeId(16), Tags: map[string]map[string]interface{}{}, Templates: []string{}}
+		ud := UserData{User: user, Salt: safeId(16), Tags: map[string]map[string]interface{}{}, Templates: []string{}, MaxSessions: 50}
 		ud.Pass, err = HashPass(pass, ud.Salt)
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
