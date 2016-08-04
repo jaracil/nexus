@@ -10,24 +10,24 @@ import (
 )
 
 type Task struct {
-	Id           string      `gorethink:"id"`
-	Stat         string      `gorethink:"stat"`
-	Path         string      `gorethink:"path"`
-	Prio         int         `gorethink:"prio"`
-	Ttl          int         `gorethink:"ttl"`
-	Detach       bool        `gorethink:"detach"`
-	User         string      `gorethink:"user"`
-	Method       string      `gorethink:"method"`
-	Params       interface{} `gorethink:"params"`
-	LocalId      interface{} `gorethink:"localId"`
-	Tses         string      `gorethink:"tses"`
-	Result       interface{} `gorethink:"result,omitempty"`
-	ErrCode      *int        `gorethink:"errCode,omitempty"`
-	ErrStr       string      `gorethink:"errStr,omitempty"`
-	ErrObj       interface{} `gorethink:"errObj,omitempty"`
-	Tags         interface{} `gorethink:"tags,omitempty"`
-	CreationTime interface{} `gorethink:"creationTime,omitempty"`
-	DeadLine     interface{} `gorethink:"deadLine,omitempty"`
+	Id           string      `gorethink:"id" json:"id"`
+	Stat         string      `gorethink:"stat" json:"state""`
+	Path         string      `gorethink:"path" json:"path"`
+	Prio         int         `gorethink:"prio" json:"priority"`
+	Ttl          int         `gorethink:"ttl" json:"ttl"`
+	Detach       bool        `gorethink:"detach" json:"detached"`
+	User         string      `gorethink:"user" json:"user"`
+	Method       string      `gorethink:"method" json:"method"`
+	Params       interface{} `gorethink:"params" json:"params"`
+	LocalId      interface{} `gorethink:"localId" json:"-"`
+	Tses         string      `gorethink:"tses" json:"targetSession"`
+	Result       interface{} `gorethink:"result,omitempty" json:"result"`
+	ErrCode      *int        `gorethink:"errCode,omitempty" json:"errCode"`
+	ErrStr       string      `gorethink:"errStr,omitempty" json:"errString"`
+	ErrObj       interface{} `gorethink:"errObj,omitempty" json:"errObject"`
+	Tags         interface{} `gorethink:"tags,omitempty" json:"tags"`
+	CreationTime interface{} `gorethink:"creationTime,omitempty" json:"creationTime"`
+	DeadLine     interface{} `gorethink:"deadLine,omitempty" json:"deadline"`
 }
 
 type TaskFeed struct {
@@ -283,6 +283,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			LocalId:      req.Id,
 			CreationTime: r.Now(),
 			DeadLine:     r.Now().Add(timeout),
+			User:         nc.user.User,
 		}
 		_, err := r.Table("tasks").Insert(task).RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
@@ -382,7 +383,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		term := r.Table("tasks").Pluck("path")
+		term := r.Table("tasks")
 
 		if skip >= 0 {
 			term = term.Skip(skip)
@@ -397,20 +398,10 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			req.Error(ErrInternal, "", nil)
 			return
 		}
-		pulls := make(map[string]int)
-		pushs := make(map[string]int)
-		var task Task
-		for cur.Next(&task) {
-			if strings.HasPrefix(task.Path, "@pull."+prefix) {
-				p := strings.TrimPrefix(task.Path, "@pull.")
-				pulls[p]++
-			} else if strings.HasPrefix(task.Path, prefix) {
-				pushs[task.Path]++
-			}
-		}
-		ret := make(map[string]interface{})
-		ret["pulls"] = pulls
-		ret["pushes"] = pushs
+		ret := make([]Task, 0)
+		cur.All(&ret)
+
+		// TODO Truncate params / errObject
 		req.Result(ret)
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
