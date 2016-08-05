@@ -402,6 +402,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		cur.All(&ret)
 
 		for _, task := range ret {
+			task.Path = strings.TrimPrefix(task.Path, "@pull.")
 			task.Params = truncateJson(task.Params)
 			task.ErrObj = truncateJson(task.ErrObj)
 		}
