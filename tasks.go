@@ -398,10 +398,14 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			req.Error(ErrInternal, "", nil)
 			return
 		}
-		ret := make([]Task, 0)
+		ret := make([]*Task, 0)
 		cur.All(&ret)
 
-		// TODO Truncate params / errObject
+		for _, task := range ret {
+			task.Params = truncateJson(task.Params)
+			task.ErrObj = truncateJson(task.ErrObj)
+		}
+
 		req.Result(ret)
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
