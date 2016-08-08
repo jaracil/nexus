@@ -87,7 +87,14 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 		}
 
 		// LOGGED IN!
-		atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(&UserData{User: ud.User, Mask: mask, Tags: maskTags(ud.Tags, mask)}))
+		atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(&UserData{
+			User:        ud.User,
+			Mask:        mask,
+			Tags:        maskTags(ud.Tags, mask),
+			MaxSessions: ud.MaxSessions,
+			Whitelist:   ud.Whitelist,
+			Blacklist:   ud.Blacklist,
+		}))
 		nc.updateSession()
 		req.Result(ei.M{"ok": true, "user": nc.user.User, "connId": nc.connId})
 
@@ -181,9 +188,15 @@ func (nc *NexusConn) checkUserLimits(ud *UserData) bool {
 
 	// Max Sessions opened?
 	// soft limit because race condition checking sessions
-	sessions, err := nci.SessionList(ud.User, ud.MaxSessions, 0)
-	if err != nil || (ud.MaxSessions > 0 && len(sessions)+1 >= ud.MaxSessions) {
-		Log.Warnf("User %s has too many sessions opened: %d/%d", ud.User, len(sessions), ud.MaxSessions)
+	sessions, err := nci.SessionList(ud.User, -1, 0)
+	seslen := 0
+	for _, u := range sessions {
+		if u.User == ud.User {
+			seslen = len(u.Sessions)
+		}
+	}
+	if err != nil || (ud.MaxSessions > 0 && seslen+1 > ud.MaxSessions) {
+		Log.Warnf("User %s has too many sessions opened: %d/%d", ud.User, seslen, ud.MaxSessions)
 		return false
 	}
 
@@ -200,8 +213,8 @@ func (nc *NexusConn) checkUserLimits(ud *UserData) bool {
 	// Whitelisted?
 	if len(ud.Whitelist) > 0 {
 		for _, wr := range ud.Whitelist {
-			Log.Warnf("User %s from %s whitelisted by %s", ud.User, remoteaddr, wr)
 			if match, err := regexp.MatchString(wr, remoteaddr); err == nil && match {
+				Log.Warnf("User %s from %s whitelisted by %s", ud.User, remoteaddr, wr)
 				return true
 			}
 		}
