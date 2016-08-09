@@ -19,7 +19,9 @@ type UserData struct {
 	Blacklist   []string                          `gorethink:"blacklist,omitempty"`
 }
 
-var Nobody *UserData = &UserData{User: "nobody", Tags: map[string]map[string]interface{}{}}
+var Nobody *UserData = &UserData{User: "nobody", Tags: map[string]map[string]interface{}{}, MaxSessions: 100000}
+
+const DEFAULT_MAX_SESSIONS = 50
 
 func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 	switch req.Method {
@@ -39,7 +41,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		ud := UserData{User: user, Salt: safeId(16), Tags: map[string]map[string]interface{}{}, Templates: []string{}, MaxSessions: 50}
+		ud := UserData{User: user, Salt: safeId(16), Tags: map[string]map[string]interface{}{}, Templates: []string{}, MaxSessions: DEFAULT_MAX_SESSIONS}
 		ud.Pass, err = HashPass(pass, ud.Salt)
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
@@ -208,7 +210,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 				"templates":   row.Field("templates").Default(ei.S{}),
 				"whitelist":   row.Field("whitelist").Default(ei.S{}),
 				"blacklist":   row.Field("blacklist").Default(ei.S{}),
-				"maxsessions": row.Field("maxsessions").Default(10),
+				"maxsessions": row.Field("maxsessions").Default(DEFAULT_MAX_SESSIONS),
 			}
 		}).Run(db)
 		if err != nil {
@@ -220,50 +222,82 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		req.Result(all)
 
 	case "user.addTemplate":
-		nc.userAddParam(req, "template", "templates")
+		param, err := ei.N(req.Params).M("template").String()
+		if err != nil {
+			req.Error(ErrInvalidParams, "template", nil)
+			return
+		}
+		nc.userAddParam(req, param, "templates")
+
 	case "user.delTemplate":
-		nc.userDelParam(req, "template", "templates")
+		param, err := ei.N(req.Params).M("template").String()
+		if err != nil {
+			req.Error(ErrInvalidParams, "template", nil)
+			return
+		}
+		nc.userDelParam(req, param, "templates")
 
 	case "user.addWhitelist":
-		nc.userAddParam(req, "whitelist", "whitelist")
+		param, err := ei.N(req.Params).M("ip").String()
+		if err != nil {
+			req.Error(ErrInvalidParams, "ip", nil)
+			return
+		}
+		nc.userAddParam(req, param, "whitelist")
+
 	case "user.delWhitelist":
-		nc.userDelParam(req, "whitelist", "whitelist")
+		param, err := ei.N(req.Params).M("ip").String()
+		if err != nil {
+			req.Error(ErrInvalidParams, "ip", nil)
+			return
+		}
+		nc.userDelParam(req, param, "whitelist")
 
 	case "user.addBlacklist":
-		nc.userAddParam(req, "blacklist", "blacklist")
+		param, err := ei.N(req.Params).M("ip").String()
+		if err != nil {
+			req.Error(ErrInvalidParams, "ip", nil)
+			return
+		}
+		nc.userAddParam(req, param, "blacklist")
+
 	case "user.delBlacklist":
-		nc.userDelParam(req, "blacklist", "blacklist")
+		param, err := ei.N(req.Params).M("ip").String()
+		if err != nil {
+			req.Error(ErrInvalidParams, "ip", nil)
+			return
+		}
+		nc.userDelParam(req, param, "blacklist")
 
 	case "user.setMaxSessions":
-		nc.userSetParam(req, "maxsessions", "maxsessions")
+		param, err := ei.N(req.Params).M("maxsessions").Int()
+		if err != nil {
+			req.Error(ErrInvalidParams, "maxsessions", nil)
+			return
+		}
+		nc.userSetParam(req, param, "maxsessions")
 
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
 	}
 }
 
-func (nc *NexusConn) userAddParam(req *JsonRpcReq, paramName, field string) {
-	nc.userChangeParam(req, paramName, field, "add")
+func (nc *NexusConn) userAddParam(req *JsonRpcReq, param interface{}, field string) {
+	nc.userChangeParam(req, param, field, "add")
 }
 
-func (nc *NexusConn) userDelParam(req *JsonRpcReq, paramName, field string) {
-	nc.userChangeParam(req, paramName, field, "del")
+func (nc *NexusConn) userDelParam(req *JsonRpcReq, param interface{}, field string) {
+	nc.userChangeParam(req, param, field, "del")
 }
 
-func (nc *NexusConn) userSetParam(req *JsonRpcReq, paramName, field string) {
-	nc.userChangeParam(req, paramName, field, "set")
+func (nc *NexusConn) userSetParam(req *JsonRpcReq, param interface{}, field string) {
+	nc.userChangeParam(req, param, field, "set")
 }
 
-func (nc *NexusConn) userChangeParam(req *JsonRpcReq, paramName, field, action string) {
+func (nc *NexusConn) userChangeParam(req *JsonRpcReq, param interface{}, field, action string) {
 	user, err := ei.N(req.Params).M("user").Lower().String()
 	if err != nil {
 		req.Error(ErrInvalidParams, "user", nil)
-		return
-	}
-
-	param, err := ei.N(req.Params).M(paramName).Lower().String()
-	if err != nil {
-		req.Error(ErrInvalidParams, paramName, nil)
 		return
 	}
 
@@ -273,13 +307,7 @@ func (nc *NexusConn) userChangeParam(req *JsonRpcReq, paramName, field, action s
 		return
 	}
 
-	paramTags := ei.N(nc.getTags(param))
-	if !(paramTags.M("@"+req.Method).BoolZ() || paramTags.M("@admin").BoolZ()) {
-		req.Error(ErrPermissionDenied, "", nil)
-		return
-	}
 	term := r.Table("users").Get(user)
-
 	switch action {
 	case "add":
 		term = term.Update(map[string]interface{}{
@@ -287,12 +315,11 @@ func (nc *NexusConn) userChangeParam(req *JsonRpcReq, paramName, field, action s
 		})
 	case "del":
 		term = term.Update(map[string]interface{}{
-			field: r.Row.Field(field).Default(ei.S{}).SetDifference([]string{param}),
+			field: r.Row.Field(field).Default(ei.S{}).SetDifference([]interface{}{param}),
 		})
 	case "set":
 		term = term.Update(map[string]interface{}{field: param})
 	}
-
 	res, err := term.RunWrite(db, r.RunOpts{Durability: "hard"})
 	if err != nil {
 		req.Error(ErrInternal, "", nil)
