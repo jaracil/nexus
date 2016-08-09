@@ -169,7 +169,9 @@ func taskPull(task *Task) bool {
 func taskWakeup(task *Task) bool {
 	for {
 		wres, err := r.Table("tasks").
-			Between(ei.S{"@pull." + task.Path, "waiting", r.MinVal, r.MinVal}, ei.S{"@pull." + task.Path, "waiting", r.MaxVal, r.MaxVal}, r.BetweenOpts{RightBound: "closed", Index: "pspc"}).
+			Between(ei.S{"@pull." + task.Path, "waiting", r.MinVal, r.MinVal},
+				ei.S{"@pull." + task.Path, "waiting", r.MaxVal, r.MaxVal},
+				r.BetweenOpts{RightBound: "closed", Index: "pspc"}).
 			Sample(1).
 			Update(r.Branch(r.Row.Field("stat").Eq("waiting"),
 				ei.M{"stat": "working"},

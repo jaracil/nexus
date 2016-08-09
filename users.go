@@ -10,11 +10,18 @@ type UserData struct {
 	Pass      string                            `gorethink:"pass,omitempty"`
 	Salt      string                            `gorethink:"salt,omitempty"`
 	Tags      map[string]map[string]interface{} `gorethink:"tags,omitempty"`
-	Mask      map[string]map[string]interface{} `gorethink:"mask,omitempty"`
 	Templates []string                          `gorethink:"templates,omitempty"`
+
+	// Limits
+	Mask        map[string]map[string]interface{} `gorethink:"mask,omitempty"`
+	MaxSessions int                               `gorethink:"maxsessions,omitempty"`
+	Whitelist   []string                          `gorethink:"whitelist,omitempty"`
+	Blacklist   []string                          `gorethink:"blacklist,omitempty"`
 }
 
-var Nobody *UserData = &UserData{User: "nobody", Tags: map[string]map[string]interface{}{}}
+var Nobody *UserData = &UserData{User: "nobody", Tags: map[string]map[string]interface{}{}, MaxSessions: 100000}
+
+const DEFAULT_MAX_SESSIONS = 50
 
 func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 	switch req.Method {
@@ -34,7 +41,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		ud := UserData{User: user, Salt: safeId(16), Tags: map[string]map[string]interface{}{}, Templates: []string{}}
+		ud := UserData{User: user, Salt: safeId(16), Tags: map[string]map[string]interface{}{}, Templates: []string{}, MaxSessions: DEFAULT_MAX_SESSIONS}
 		ud.Pass, err = HashPass(pass, ud.Salt)
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
@@ -50,6 +57,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			return
 		}
 		req.Result(map[string]interface{}{"ok": true})
+
 	case "user.delete":
 		user, err := ei.N(req.Params).M("user").Lower().String()
 		if err != nil {
@@ -134,6 +142,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			return
 		}
 		req.Result(map[string]interface{}{"ok": true})
+
 	case "user.setPass":
 		user, err := ei.N(req.Params).M("user").Lower().String()
 		if err != nil {
@@ -166,6 +175,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			return
 		}
 		req.Result(map[string]interface{}{"ok": true})
+
 	case "user.list":
 		prefix := ei.N(req.Params).M("prefix").Lower().StringZ()
 		limit, err := ei.N(req.Params).M("limit").Int()
@@ -183,7 +193,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		}
 		term := r.Table("users").
 			Between(prefix, prefix+"\uffff").
-			Pluck("id", "tags")
+			Pluck("id", "tags", "templates", "whitelist", "blacklist", "maxsessions")
 
 		if skip >= 0 {
 			term = term.Skip(skip)
@@ -194,7 +204,14 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		}
 
 		cur, err := term.Map(func(row r.Term) interface{} {
-			return ei.M{"user": row.Field("id"), "tags": row.Field("tags").Default(ei.M{})}
+			return ei.M{
+				"user":        row.Field("id"),
+				"tags":        row.Field("tags").Default(ei.M{}),
+				"templates":   row.Field("templates").Default(ei.S{}),
+				"whitelist":   row.Field("whitelist").Default(ei.S{}),
+				"blacklist":   row.Field("blacklist").Default(ei.S{}),
+				"maxsessions": row.Field("maxsessions").Default(DEFAULT_MAX_SESSIONS),
+			}
 		}).Run(db)
 		if err != nil {
 			req.Error(ErrInternal, err.Error(), nil)
@@ -205,112 +222,112 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		req.Result(all)
 
 	case "user.addTemplate":
-		user, err := ei.N(req.Params).M("user").Lower().String()
-		if err != nil {
-			req.Error(ErrInvalidParams, "user", nil)
-			return
-		}
-
-		template, err := ei.N(req.Params).M("template").Lower().String()
+		param, err := ei.N(req.Params).M("template").String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "template", nil)
 			return
 		}
-
-		userTags := ei.N(nc.getTags(user))
-		if !(userTags.M("@"+req.Method).BoolZ() || userTags.M("@admin").BoolZ()) {
-			req.Error(ErrPermissionDenied, "", nil)
-			return
-		}
-
-		templateTags := ei.N(nc.getTags(template))
-		if !(templateTags.M("@"+req.Method).BoolZ() || templateTags.M("@admin").BoolZ()) {
-			req.Error(ErrPermissionDenied, "", nil)
-			return
-		}
-
-		res, err := r.Table("users").Get(user).Update(map[string]interface{}{
-			"templates": r.Row.Field("templates").Default([]string{}).SetInsert(template),
-		}).RunWrite(db, r.RunOpts{Durability: "hard"})
-		if err != nil {
-			req.Error(ErrInternal, "", nil)
-			return
-		}
-		if res.Unchanged == 0 && res.Replaced == 0 {
-			req.Error(ErrInvalidUser, "", nil)
-			return
-		}
-		req.Result(map[string]interface{}{"ok": true})
+		nc.userAddParam(req, param, "templates")
 
 	case "user.delTemplate":
-		user, err := ei.N(req.Params).M("user").Lower().String()
-		if err != nil {
-			req.Error(ErrInvalidParams, "user", nil)
-			return
-		}
-
-		template, err := ei.N(req.Params).M("template").Lower().String()
+		param, err := ei.N(req.Params).M("template").String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "template", nil)
 			return
 		}
+		nc.userDelParam(req, param, "templates")
 
-		userTags := ei.N(nc.getTags(user))
-		if !(userTags.M("@"+req.Method).BoolZ() || userTags.M("@admin").BoolZ()) {
-			req.Error(ErrPermissionDenied, "", nil)
-			return
-		}
-
-		templateTags := ei.N(nc.getTags(template))
-		if !(templateTags.M("@"+req.Method).BoolZ() || templateTags.M("@admin").BoolZ()) {
-			req.Error(ErrPermissionDenied, "", nil)
-			return
-		}
-
-		res, err := r.Table("users").Get(user).Update(map[string]interface{}{
-			"templates": r.Row.Field("templates").Default(ei.S{}).SetDifference([]string{template}),
-		}).RunWrite(db, r.RunOpts{Durability: "hard"})
+	case "user.addWhitelist":
+		param, err := ei.N(req.Params).M("ip").String()
 		if err != nil {
-			req.Error(ErrInternal, "", nil)
+			req.Error(ErrInvalidParams, "ip", nil)
 			return
 		}
-		if res.Unchanged == 0 && res.Replaced == 0 {
-			req.Error(ErrInvalidUser, "", nil)
-			return
-		}
-		req.Result(map[string]interface{}{"ok": true})
+		nc.userAddParam(req, param, "whitelist")
 
-	case "user.listTemplate":
-		user, err := ei.N(req.Params).M("user").Lower().String()
-
-		userTags := ei.N(nc.getTags(user))
-		if !(userTags.M("@"+req.Method).BoolZ() || userTags.M("@admin").BoolZ()) {
-			req.Error(ErrPermissionDenied, "", nil)
-			return
-		}
-
-		type udt struct {
-			Templates []string `gorethink:"templates"`
-		}
-
-		res, err := r.Table("users").Get(user).Pluck("templates").Run(db)
+	case "user.delWhitelist":
+		param, err := ei.N(req.Params).M("ip").String()
 		if err != nil {
-			req.Error(ErrInvalidUser, "", nil)
+			req.Error(ErrInvalidParams, "ip", nil)
 			return
 		}
+		nc.userDelParam(req, param, "whitelist")
 
-		ret := udt{Templates: []string{}}
-		if err := res.One(&ret); err != nil && err != r.ErrEmptyResult {
-			req.Error(ErrInternal, "", nil)
+	case "user.addBlacklist":
+		param, err := ei.N(req.Params).M("ip").String()
+		if err != nil {
+			req.Error(ErrInvalidParams, "ip", nil)
 			return
 		}
+		nc.userAddParam(req, param, "blacklist")
 
-		if len(ret.Templates) == 0 {
-			ret.Templates = []string{}
+	case "user.delBlacklist":
+		param, err := ei.N(req.Params).M("ip").String()
+		if err != nil {
+			req.Error(ErrInvalidParams, "ip", nil)
+			return
 		}
-		req.Result(ret.Templates)
+		nc.userDelParam(req, param, "blacklist")
+
+	case "user.setMaxSessions":
+		param, err := ei.N(req.Params).M("maxsessions").Int()
+		if err != nil {
+			req.Error(ErrInvalidParams, "maxsessions", nil)
+			return
+		}
+		nc.userSetParam(req, param, "maxsessions")
 
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
 	}
+}
+
+func (nc *NexusConn) userAddParam(req *JsonRpcReq, param interface{}, field string) {
+	nc.userChangeParam(req, param, field, "add")
+}
+
+func (nc *NexusConn) userDelParam(req *JsonRpcReq, param interface{}, field string) {
+	nc.userChangeParam(req, param, field, "del")
+}
+
+func (nc *NexusConn) userSetParam(req *JsonRpcReq, param interface{}, field string) {
+	nc.userChangeParam(req, param, field, "set")
+}
+
+func (nc *NexusConn) userChangeParam(req *JsonRpcReq, param interface{}, field, action string) {
+	user, err := ei.N(req.Params).M("user").Lower().String()
+	if err != nil {
+		req.Error(ErrInvalidParams, "user", nil)
+		return
+	}
+
+	userTags := ei.N(nc.getTags(user))
+	if !(userTags.M("@"+req.Method).BoolZ() || userTags.M("@admin").BoolZ()) {
+		req.Error(ErrPermissionDenied, "", nil)
+		return
+	}
+
+	term := r.Table("users").Get(user)
+	switch action {
+	case "add":
+		term = term.Update(map[string]interface{}{
+			field: r.Row.Field(field).Default(ei.S{}).SetInsert(param),
+		})
+	case "del":
+		term = term.Update(map[string]interface{}{
+			field: r.Row.Field(field).Default(ei.S{}).SetDifference([]interface{}{param}),
+		})
+	case "set":
+		term = term.Update(map[string]interface{}{field: param})
+	}
+	res, err := term.RunWrite(db, r.RunOpts{Durability: "hard"})
+	if err != nil {
+		req.Error(ErrInternal, "", nil)
+		return
+	}
+	if res.Unchanged == 0 && res.Replaced == 0 {
+		req.Error(ErrInvalidUser, "", nil)
+		return
+	}
+	req.Result(map[string]interface{}{"ok": true})
 }
