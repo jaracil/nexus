@@ -1,11 +1,7 @@
 // Package log
 package log
 
-import (
-	"strings"
-
-	"github.com/Sirupsen/logrus"
-)
+import "github.com/Sirupsen/logrus"
 
 // Singleton logrus logger object with custom format.
 // Verbosity can be changed through SetLogLevel.
@@ -31,20 +27,46 @@ func init() {
 }
 
 // Sets log level to one of (debug, info, warn, error, fatal, panic)
-func SetLogLevel(l string) error {
-	switch strings.ToLower(l) {
-	case "debug":
+func SetLogLevel(l uint8) {
+	switch l {
+	case DebugLevel:
 		Log.Level = logrus.DebugLevel
-	case "info":
+	case InfoLevel:
 		Log.Level = logrus.InfoLevel
-	case "warn":
+	case WarnLevel:
 		Log.Level = logrus.WarnLevel
-	case "error":
+	case ErrorLevel:
 		Log.Level = logrus.ErrorLevel
-	case "fatal":
+	case FatalLevel:
 		Log.Level = logrus.FatalLevel
-	case "panic":
+	case PanicLevel:
 		Log.Level = logrus.PanicLevel
+
+	default:
+		Log.Level = logrus.DebugLevel
 	}
-	return nil
+}
+
+func GetLogLevel() uint8 {
+	switch Log.Level {
+	case logrus.DebugLevel:
+		return DebugLevel
+	case logrus.InfoLevel:
+		return InfoLevel
+	case logrus.WarnLevel:
+		return WarnLevel
+	case logrus.ErrorLevel:
+		return ErrorLevel
+	case logrus.FatalLevel:
+		return FatalLevel
+	case logrus.PanicLevel:
+		return PanicLevel
+
+	default:
+		return DebugLevel
+	}
+}
+
+func LogLevelIs(l uint8) bool {
+	return GetLogLevel() == l
 }

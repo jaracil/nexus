@@ -60,6 +60,13 @@ func exit(cause string) {
 
 func main() {
 	parseOptions()
+
+	if opts.Verbose {
+		SetLogLevel(DebugLevel)
+	} else {
+		SetLogLevel(InfoLevel)
+	}
+
 	nodeId = safeId(4)
 	signal.Notify(sigChan)
 	go signalManager()
