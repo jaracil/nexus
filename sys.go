@@ -202,6 +202,14 @@ func (nc *NexusConn) checkUserLimits(ud *UserData) bool {
 
 	remoteaddr := nc.conn.RemoteAddr().String()
 
+	// Whitelisted?
+	for _, wr := range ud.Whitelist {
+		if match, err := regexp.MatchString(wr, remoteaddr); err == nil && match {
+			Log.Warnf("User %s from %s whitelisted by %s", ud.User, remoteaddr, wr)
+			return true
+		}
+	}
+
 	// Blacklisted?
 	for _, br := range ud.Blacklist {
 		if match, err := regexp.MatchString(br, remoteaddr); err == nil && match {
@@ -210,19 +218,7 @@ func (nc *NexusConn) checkUserLimits(ud *UserData) bool {
 		}
 	}
 
-	// Whitelisted?
-	if len(ud.Whitelist) > 0 {
-		for _, wr := range ud.Whitelist {
-			if match, err := regexp.MatchString(wr, remoteaddr); err == nil && match {
-				Log.Warnf("User %s from %s whitelisted by %s", ud.User, remoteaddr, wr)
-				return true
-			}
-		}
-	} else {
-		return true
-	}
-
-	return false
+	return true
 }
 
 func (nc *NexusConn) BasicAuth(params interface{}) (string, map[string]map[string]interface{}, int) {
