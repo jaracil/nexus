@@ -21,9 +21,13 @@ func listeners(ctx context.Context) {
 
 			switch u.Scheme {
 			case "tcp":
-				go tcpListener(u, ctx)
+				go tcpListener(u, ctx, false)
+			case "tcp+proxy":
+				go tcpListener(u, ctx, true)
 			case "ssl":
-				go sslListener(u, ctx)
+				go sslListener(u, ctx, false)
+			case "ssl+proxy":
+				go sslListener(u, ctx, true)
 			case "http":
 				go httpListener(u, ctx)
 			case "https":
