@@ -193,6 +193,7 @@ func (nc *NexusConn) checkUserLimits(ud *UserData) bool {
 	for _, u := range sessions {
 		if u.User == ud.User {
 			seslen = len(u.Sessions)
+			break
 		}
 	}
 	if err != nil || (ud.MaxSessions > 0 && seslen+1 > ud.MaxSessions) {

@@ -358,7 +358,14 @@ func (nc *NexusConn) reload(fromSameSession bool) (bool, int) {
 		return false, ErrInternal
 	}
 
-	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(&UserData{User: ud.User, Mask: ud.Mask, Tags: maskTags(ud.Tags, ud.Mask)}))
+	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(&UserData{
+		User:        ud.User,
+		Mask:        nc.user.Mask,
+		Tags:        maskTags(ud.Tags, nc.user.Mask),
+		MaxSessions: ud.MaxSessions,
+		Whitelist:   ud.Whitelist,
+		Blacklist:   ud.Blacklist,
+	}))
 
 	if !fromSameSession {
 		wres, err := r.Table("sessions").
