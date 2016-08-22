@@ -43,7 +43,7 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 		switch method {
 		case "", "basic":
 			var err int
-			user, mask, err = nc.BasicAuth(req.Params)
+			user, _, err = nc.BasicAuth(req.Params)
 			if err != ErrNoError {
 				req.Error(err, "", nil)
 				return
