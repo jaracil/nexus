@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
@@ -208,11 +209,13 @@ func dbClean(prefix string) (err error) {
 	}
 	for _, change := range wres.Changes {
 		task := ei.N(change.OldValue)
-		hook("task", task.M("path").StringZ()+task.M("method").StringZ(), task.M("user").StringZ(), ei.M{
-			"action": "pusherDisconnect",
-			"id": task.M("id").StringZ(),
-			"timestamp": time.Now().UTC(),
-		})
+		if path := task.M("path").StringZ(); !strings.HasPrefix(path, "@pull.") {
+			hook("task", path+task.M("method").StringZ(), task.M("user").StringZ(), ei.M{
+				"action": "pusherDisconnect",
+				"id": task.M("id").StringZ(),
+				"timestamp": time.Now().UTC(),
+			})
+		}
 	}
 		
 	// Recover all tasks whose target session is this prefix

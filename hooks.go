@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"fmt"
 	"sync"
 	"time"
@@ -12,8 +13,7 @@ import (
 
 type HookBans struct {
 	*sync.RWMutex
-	Task map[string]time.Time
-	User map[string]time.Time
+	Map map[string]time.Time
 }
 
 type HookCache struct {
@@ -47,7 +47,6 @@ var _validHookTypes = []string{"task", "user"}
 
 var hookBans = &HookBans{
 	&sync.RWMutex{},
-	map[string]time.Time{},
 	map[string]time.Time{},
 }
 var _hookBanTime = time.Minute * 5
@@ -100,41 +99,62 @@ func hook(ty string, path string, user string, data interface{}) {
 
 func hookBan(ty string, path string, user string) {
 	hookBans.Lock()
-	var banMap map[string]time.Time
-	switch ty {
-		case "task":
-			banMap = hookBans.Task
-		case "user":
-			banMap = hookBans.User
-	}
-	banMap[path+"|"+user] = time.Now().Add(_hookBanTime)
+	hookBans.Map[ty+"|"+path+"|"+user] = time.Now().Add(_hookBanTime)
 	hookBans.Unlock()
 }
 
 func hookUnban(ty string, path string, user string) {
 	hookBans.Lock()
-	var banMap map[string]time.Time
-	switch ty {
-		case "task":
-			banMap = hookBans.Task
-		case "user":
-			banMap = hookBans.User
+	typ, _ := normalizeHookPath(ty)
+	if typ == "" { // All
+		hookBans.Map = map[string]time.Time{}
+	} else {
+		pth, rec := normalizeHookPath(path)
+		if pth == "" && rec { // All paths of one type
+			for k, _ := range hookBans.Map {
+				if strings.HasPrefix(k, ty+"|") {
+					delete(hookBans.Map, k)
+				}
+			}
+		} else if rec { // Some paths of one type
+			for k, _ := range hookBans.Map {
+				if strings.HasPrefix(k, ty+"|"+pth+".") || strings.HasPrefix(k, ty+"|"+pth+"|") {
+					delete(hookBans.Map, k)
+				}
+			}
+		} else {
+			usr, rec := normalizeHookPath(user)
+			if usr == "" && rec { // All users of one path
+				for k, _ := range hookBans.Map {
+					if strings.HasPrefix(k, ty+"|"+pth+"|") {
+						delete(hookBans.Map, k)
+					}
+				}
+			} else if rec { // Some users of one path
+				for k, _ := range hookBans.Map {
+					if strings.HasPrefix(k, ty+"|"+pth+"|"+usr+".") || k == ty+"|"+pth+"|"+usr {
+						delete(hookBans.Map, k)
+					}
+				}
+			} else { // One user of one path
+				delete(hookBans.Map, ty+"|"+pth+"|"+usr)
+			}
+		}
 	}
-	delete(banMap, path+"|"+user)
 	hookBans.Unlock()
+}
+
+func normalizeHookPath(s string) (string, bool) {
+	if s == "" || s == "*" {
+		return "", true	
+	}
+	recursive := strings.HasSuffix(s, ".*")
+	return strings.TrimRight(s, "*."), recursive
 }
 
 func hookIsBanned(ty string, path string, user string) bool {
 	hookBans.RLock()
-	var banMap map[string]time.Time
-	switch ty {
-		case "task":
-			banMap = hookBans.Task
-		case "user":
-			banMap = hookBans.User
-	}
-
-	if t, ok := banMap[path+"|"+user]; ok {
+	if t, ok := hookBans.Map[ty+"|"+path+"|"+user]; ok {
 		if time.Since(t) <= 0 {
 			hookBans.RUnlock()
 			return true
@@ -175,7 +195,7 @@ HookLoop:
 				continue HookLoop
 			}
 			if topicData.Drops != 0 {
-				Log.Printf("Got %d drops reading from pipe on hooks topic-listen", topicData.Drops)
+				Log.Warnf("Got %d drops reading from pipe on hooks topic-listen", topicData.Drops)
 			}
 			for _, msg := range topicData.Msgs {
 				m := ei.N(msg.Msg)

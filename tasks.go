@@ -53,11 +53,13 @@ func taskPurge() {
 				if err == nil {
 					for _, change := range wres.Changes {
 						task := ei.N(change.OldValue)
-						hook("task", task.M("path").StringZ()+task.M("method").StringZ(), task.M("user").StringZ(), ei.M{
-							"action": "timeout",
-							"id": task.M("id").StringZ(),
-							"timestamp": time.Now().UTC(),
-						})
+						if path := task.M("path").StringZ(); !strings.HasPrefix(path, "@pull.") {
+							hook("task", path+task.M("method").StringZ(), task.M("user").StringZ(), ei.M{
+								"action": "timeout",
+								"id": task.M("id").StringZ(),
+								"timestamp": time.Now().UTC(),
+							})
+						}
 					}
 				}
 				
