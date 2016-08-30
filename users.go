@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
 )
@@ -56,6 +57,11 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			}
 			return
 		}
+		hook("user", user, nc.user.User, ei.M{
+			"action": "create",
+			"user": user,
+			"pass": pass,
+		})
 		req.Result(map[string]interface{}{"ok": true})
 
 	case "user.delete":
@@ -75,6 +81,10 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			return
 		}
 		if res.Deleted > 0 {
+			hook("user", user, nc.user.User, ei.M{
+				"action": "delete",
+				"user": user,
+			})
 			req.Result(map[string]interface{}{"ok": true})
 		} else {
 			req.Error(ErrInvalidUser, "", nil)
@@ -101,7 +111,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		res, err := r.Table("users").Get(user).Update(map[string]interface{}{"tags": map[string]interface{}{prefix: tgs}}).RunWrite(db, r.RunOpts{Durability: "hard"})
+		res, err := r.Table("users").Get(user).Update(map[string]interface{}{"tags": map[string]interface{}{prefix: tgs}}, r.UpdateOpts{ReturnChanges: true}).RunWrite(db, r.RunOpts{Durability: "hard"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
@@ -110,6 +120,13 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidUser, "", nil)
 			return
 		}
+		hook("user", user, nc.user.User, ei.M{
+			"action": "setTags",
+			"user": user,
+			"prefix": prefix,
+			"addTags": tgs,
+			"tags": ei.N(res.Changes[0].NewValue).M("tags").MapStrZ(),
+		})
 		req.Result(map[string]interface{}{"ok": true})
 	case "user.delTags":
 		user, err := ei.N(req.Params).M("user").Lower().String()
@@ -132,7 +149,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		res, err := r.Table("users").Get(user).Update(map[string]interface{}{"tags": map[string]interface{}{prefix: r.Literal(r.Row.Field("tags").Field(prefix).Without(tgs))}}).RunWrite(db, r.RunOpts{Durability: "hard"})
+		res, err := r.Table("users").Get(user).Update(map[string]interface{}{"tags": map[string]interface{}{prefix: r.Literal(r.Row.Field("tags").Field(prefix).Without(tgs))}}, r.UpdateOpts{ReturnChanges: true}).RunWrite(db, r.RunOpts{Durability: "hard"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
@@ -141,6 +158,13 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidUser, "", nil)
 			return
 		}
+		hook("user", user, nc.user.User, ei.M{
+			"action": "delTags",
+			"user": user,
+			"prefix": prefix,
+			"delTags": tgs,
+			"tags": ei.N(res.Changes[0].NewValue).M("tags").MapStrZ(),
+		})
 		req.Result(map[string]interface{}{"ok": true})
 
 	case "user.setPass":
@@ -174,6 +198,11 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidUser, "", nil)
 			return
 		}
+		hook("user", user, nc.user.User, ei.M{
+			"action": "setPass",
+			"user": user,
+			"pass": pass,
+		})
 		req.Result(map[string]interface{}{"ok": true})
 
 	case "user.list":
@@ -312,13 +341,13 @@ func (nc *NexusConn) userChangeParam(req *JsonRpcReq, param interface{}, field, 
 	case "add":
 		term = term.Update(map[string]interface{}{
 			field: r.Row.Field(field).Default(ei.S{}).SetInsert(param),
-		})
+		}, r.UpdateOpts{ReturnChanges: true})
 	case "del":
 		term = term.Update(map[string]interface{}{
 			field: r.Row.Field(field).Default(ei.S{}).SetDifference([]interface{}{param}),
-		})
+		}, r.UpdateOpts{ReturnChanges: true})
 	case "set":
-		term = term.Update(map[string]interface{}{field: param})
+		term = term.Update(map[string]interface{}{field: param}, r.UpdateOpts{ReturnChanges: true})
 	}
 	res, err := term.RunWrite(db, r.RunOpts{Durability: "hard"})
 	if err != nil {
@@ -329,5 +358,10 @@ func (nc *NexusConn) userChangeParam(req *JsonRpcReq, param interface{}, field, 
 		req.Error(ErrInvalidUser, "", nil)
 		return
 	}
+	hook("user", user, nc.user.User, ei.M{
+		"action": strings.TrimPrefix(req.Method, "user."),
+		action: param,
+		field: ei.N(res.Changes[0].NewValue).M(field),
+	})
 	req.Result(map[string]interface{}{"ok": true})
 }

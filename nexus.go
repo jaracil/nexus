@@ -83,7 +83,7 @@ func main() {
 	go pipeTrack()
 	go sessionTrack()
 	go taskPurge()
-	go hooksTopicListen()
+	go hooksTrack()
 
 	listen()
 

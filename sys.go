@@ -96,6 +96,15 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 			Blacklist:   ud.Blacklist,
 		}))
 		nc.updateSession()
+		hook("user", ud.User, ud.User, ei.M{
+			"action": "login",
+			"user": nc.user.User,
+			"mask": nc.user.Mask,
+			"tags": nc.user.Tags,
+			"maxSessions": nc.user.MaxSessions,
+			"whitelist": nc.user.Whitelist,
+			"blacklist": nc.user.Blacklist,		
+		})
 		req.Result(ei.M{"ok": true, "user": nc.user.User, "connId": nc.connId})
 
 	case "sys.reload":

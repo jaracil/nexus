@@ -10,31 +10,73 @@ import (
 	"github.com/jaracil/ei"
 )
 
-var _hookBanTime = time.Minute * 5
-
 type HookBans struct {
 	*sync.RWMutex
 	Task map[string]time.Time
+	User map[string]time.Time
 }
+
+type HookCache struct {
+	*sync.Mutex
+	Map map[string]*HookCacheItem
+}
+
+type HookCacheItem struct {
+	List []interface{}
+	Expire time.Time
+}
+
+func (c *HookCache) Get(p string) []interface{} {
+	c.Lock()
+	if res, ok := c.Map[p]; ok {
+		res.Expire = time.Now().Add(_hookCacheTime)
+		c.Unlock()
+		return res.List
+	}
+	c.Unlock()
+	return nil
+}
+
+func (c *HookCache) Set(p string, list []interface{}) {
+	c.Lock()
+	c.Map[p] = &HookCacheItem{list, time.Now().Add(_hookCacheTime)}
+	c.Unlock()
+}
+
+var _validHookTypes = []string{"task", "user"}
 
 var hookBans = &HookBans{
 	&sync.RWMutex{},
 	map[string]time.Time{},
+	map[string]time.Time{},
 }
+var _hookBanTime = time.Minute * 5
 
-var _validHookTypes = []string{"task"}
+var hookCache = &HookCache{
+	&sync.Mutex{},
+	map[string]*HookCacheItem{},
+}
+var _hookCacheTime = time.Hour
+var _hookCacheExpirePeriod = time.Minute * 30
 
 func hookList(ty string, path string, user string) (res []interface{}) {
+	p := fmt.Sprintf("%s|%s|%s", ty, path, user)
+	if res = hookCache.Get(p); res != nil {
+		return res
+	}
+	res = append(res, "hook.*", "hook."+ty+".*")
 	for _, ps := range topicList(path) {
+		res = append(res, fmt.Sprintf("hook.%s|%s", ty, ps))
 		for _, us := range topicList(user) {
-			res = append(res, fmt.Sprintf("%s|%s|%s", ty, ps, us))
+			res = append(res, fmt.Sprintf("hook.%s|%s|%s", ty, ps, us))
 		}
 	}
+	hookCache.Set(p, res)
 	return
 }
 
 func hookPublish(ty string, path string, user string, message interface{}) (int, error) {
-	msg := ei.M{"topic": fmt.Sprintf("%s|%s|%s", ty, path, user), "msg": message}
+	msg := ei.M{"topic": fmt.Sprintf("hook.%s|%s|%s", ty, path, user), "msg": message}
 	hookTopics := hookList(ty, path, user)
 	res, err := r.Table("pipes").
 		GetAllByIndex("subs", hookTopics...).
@@ -48,7 +90,7 @@ func hook(ty string, path string, user string, data interface{}) {
 		return	
 	}
 	switch ty {
-		case "task":
+		case "task", "user":
 			n, _ := hookPublish(ty, path, user, data)
 			if n == 0 {
 				hookBan(ty, path, user)
@@ -58,19 +100,27 @@ func hook(ty string, path string, user string, data interface{}) {
 
 func hookBan(ty string, path string, user string) {
 	hookBans.Lock()
+	var banMap map[string]time.Time
 	switch ty {
 		case "task":
-			hookBans.Task[path+"|"+user] = time.Now().Add(_hookBanTime)
+			banMap = hookBans.Task
+		case "user":
+			banMap = hookBans.User
 	}
+	banMap[path+"|"+user] = time.Now().Add(_hookBanTime)
 	hookBans.Unlock()
 }
 
 func hookUnban(ty string, path string, user string) {
 	hookBans.Lock()
+	var banMap map[string]time.Time
 	switch ty {
 		case "task":
-			delete(hookBans.Task, path+"|"+user)
+			banMap = hookBans.Task
+		case "user":
+			banMap = hookBans.User
 	}
+	delete(banMap, path+"|"+user)
 	hookBans.Unlock()
 }
 
@@ -80,6 +130,8 @@ func hookIsBanned(ty string, path string, user string) bool {
 	switch ty {
 		case "task":
 			banMap = hookBans.Task
+		case "user":
+			banMap = hookBans.User
 	}
 
 	if t, ok := banMap[path+"|"+user]; ok {
@@ -95,7 +147,8 @@ func hookIsBanned(ty string, path string, user string) bool {
 	return false
 }
 
-func hooksTopicListen() {
+func hooksTrack() {
+	go hookCacheExpire()
 	defer exit("hooks topic-listen error")
 	nic := NewInternalClient()
 	defer nic.Close()
@@ -132,5 +185,19 @@ HookLoop:
 				hookUnban(ty, path, user)
 			}
 		}
+	}
+}
+
+func hookCacheExpire() {
+	for {
+		time.Sleep(_hookCacheExpirePeriod)
+		hookCache.Lock()
+		now := time.Now()
+		for key, ci := range hookCache.Map {
+			if ci.Expire.Before(now) {
+				delete(hookCache.Map, key)
+			}
+		}
+		hookCache.Unlock()
 	}
 }
