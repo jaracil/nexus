@@ -43,13 +43,24 @@ func taskPurge() {
 		select {
 		case <-tick.C:
 			if isMasterNode() {
-				r.Table("tasks").
+				wres, err := r.Table("tasks").
 					Between(r.MinVal, r.Now(), r.BetweenOpts{Index: "deadLine"}).
 					Update(r.Branch(r.Row.Field("stat").Ne("done"),
 						ei.M{"stat": "done", "errCode": ErrTimeout, "errStr": ErrStr[ErrTimeout], "deadLine": r.Now().Add(600)},
 						ei.M{}),
-						r.UpdateOpts{ReturnChanges: false}).
+						r.UpdateOpts{ReturnChanges: true}).
 					RunWrite(db, r.RunOpts{Durability: "soft"})
+				if err == nil {
+					for _, change := range wres.Changes {
+						task := ei.N(change.OldValue)
+						hook("task", task.M("path").StringZ()+task.M("method").StringZ(), task.M("user").StringZ(), ei.M{
+							"action": "timeout",
+							"id": task.M("id").StringZ(),
+							"timestamp": time.Now().UTC(),
+						})
+					}
+				}
+				
 				r.Table("tasks").
 					Between(r.MinVal, r.Now(), r.BetweenOpts{Index: "deadLine"}).
 					Filter(r.Row.Field("stat").Eq("done")).
@@ -150,6 +161,14 @@ func taskPull(task *Task) bool {
 					RunWrite(db, r.RunOpts{Durability: "soft"})
 				break
 			}
+			hook("task", newTask.M("path").StringZ()+newTask.M("method").StringZ(), newTask.M("user").StringZ(), ei.M{
+				"action": "pull",
+				"id": result["taskid"],
+				"connId": task.Id[0:16],
+				"user": task.User,
+				"ttl": newTask.M("ttl").IntZ(),
+				"timestamp": time.Now().UTC(),
+			})
 			return true
 		}
 		if wres.Unchanged > 0 {
@@ -196,10 +215,20 @@ func deleteTask(id string) {
 }
 
 func taskExpireTtl(taskid string) {
-	r.Table("tasks").
+	wres, err := r.Table("tasks").
 		Get(taskid).
-		Update(ei.M{"stat": "done", "errCode": ErrTtlExpired, "errStr": ErrStr[ErrTtlExpired], "deadLine": r.Now().Add(600)}).
+		Update(ei.M{"stat": "done", "errCode": ErrTtlExpired, "errStr": ErrStr[ErrTtlExpired], "deadLine": r.Now().Add(600)}, r.UpdateOpts{ReturnChanges: true}).
 		RunWrite(db, r.RunOpts{Durability: "soft"})
+	if err == nil {
+		for _, change := range wres.Changes {
+			task := ei.N(change.OldValue)
+			hook("task", task.M("path").StringZ()+task.M("method").StringZ(), task.M("user").StringZ(), ei.M{
+				"action": "ttlExpired",
+				"id": task.M("id").StringZ(),
+				"timestamp": time.Now().UTC(),
+			})
+		}
+	}
 }
 
 func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
@@ -247,11 +276,26 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			CreationTime: r.Now(),
 			DeadLine:     r.Now().Add(timeout),
 		}
-		_, err = r.Table("tasks").Insert(task).RunWrite(db, r.RunOpts{Durability: "soft"})
+		_, err = r.Table("tasks").Insert(task, r.InsertOpts{}).RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
 		}
+		hook("task", task.Path+task.Method, task.User, ei.M{
+			"action": "push",
+			"id": task.Id,
+			"connId": nc.connId,
+			"user": nc.user.User,
+			"tags": nc.user.Tags,
+			"path": path,
+			"method": met,
+			"params": params,
+			"detach": detach,
+			"ttl": ttl,
+			"prio": prio,
+			"timestamp": time.Now().UTC(),
+			"timeout": timeout,
+		})
 		if detach {
 			req.Result(ei.M{"ok": true})
 		}
@@ -298,13 +342,20 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		result := ei.N(req.Params).M("result").RawZ()
 		res, err := r.Table("tasks").
 			Get(taskid).
-			Update(ei.M{"stat": "done", "result": result, "deadLine": r.Now().Add(600)}).
+			Update(ei.M{"stat": "done", "result": result, "deadLine": r.Now().Add(600)}, r.UpdateOpts{ReturnChanges: true}).
 			RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
 		}
 		if res.Replaced > 0 {
+			task := ei.N(res.Changes[0].OldValue)
+			hook("task", task.M("path").StringZ()+task.M("method").StringZ(), task.M("user").StringZ(), ei.M{
+				"action": "result",
+				"id": taskid,
+				"result": result,
+				"timestamp": time.Now().UTC(),
+			})
 			req.Result(ei.M{"ok": true})
 		} else {
 			req.Error(ErrInvalidTask, "", nil)
@@ -317,13 +368,22 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		data := ei.N(req.Params).M("data").RawZ()
 		res, err := r.Table("tasks").
 			Get(taskid).
-			Update(ei.M{"stat": "done", "errCode": code, "errStr": message, "errObj": data, "deadLine": r.Now().Add(600)}).
+			Update(ei.M{"stat": "done", "errCode": code, "errStr": message, "errObj": data, "deadLine": r.Now().Add(600)}, r.UpdateOpts{ReturnChanges: true}).
 			RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
 		}
 		if res.Replaced > 0 {
+			task := ei.N(res.Changes[0].OldValue)
+			hook("task", task.M("path").StringZ()+task.M("method").StringZ(), task.M("user").StringZ(), ei.M{
+				"action": "error",
+				"id": taskid,
+				"code": code,
+				"message": message,
+				"data": data,
+				"timestamp": time.Now().UTC(),
+			})
 			req.Result(ei.M{"ok": true})
 		} else {
 			req.Error(ErrInvalidTask, "", nil)
@@ -333,13 +393,19 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		taskid := ei.N(req.Params).M("taskid").StringZ()
 		res, err := r.Table("tasks").
 			Get(taskid).
-			Update(ei.M{"stat": "waiting", "tses": nil, "ttl": r.Row.Field("ttl").Add(-1)}).
+			Update(ei.M{"stat": "waiting", "tses": nil, "ttl": r.Row.Field("ttl").Add(-1)}, r.UpdateOpts{ReturnChanges: true}).
 			RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
 		}
 		if res.Replaced > 0 {
+			task := ei.N(res.Changes[0].OldValue)
+			hook("task", task.M("path").StringZ()+task.M("method").StringZ(), task.M("user").StringZ(), ei.M{
+				"action": "reject",
+				"id": taskid,
+				"timestamp": time.Now().UTC(),
+			})
 			req.Result(ei.M{"ok": true})
 		} else {
 			req.Error(ErrInvalidTask, "", nil)
@@ -347,20 +413,26 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 
 	case "task.cancel":
 		id := ei.N(req.Params).M("id").RawZ()
-		res, err := r.Table("tasks").
+		wres, err := r.Table("tasks").
 			Between(nc.connId, nc.connId+"\uffff").
 			Filter(r.Row.Field("localId").Eq(id)).
 			Update(r.Branch(r.Row.Field("stat").Ne("done"),
 				ei.M{"stat": "done", "errCode": ErrCancel, "errStr": ErrStr[ErrCancel], "deadLine": r.Now().Add(600)},
 				ei.M{}),
-				r.UpdateOpts{ReturnChanges: false}).
+				r.UpdateOpts{ReturnChanges: true}).
 			RunWrite(db, r.RunOpts{Durability: "soft"})
 
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
 		}
-		if res.Replaced > 0 {
+		if wres.Replaced > 0 {
+			task := ei.N(wres.Changes[0].NewValue)
+			hook("task", task.M("path").StringZ()+task.M("method").StringZ(), task.M("user").StringZ(), ei.M{
+				"action": "cancel",
+				"id": task.M("taskid").StringZ(),
+				"timestamp": time.Now().UTC(),
+			})
 			req.Result(ei.M{"ok": true})
 		} else {
 			req.Error(ErrInvalidTask, "", nil)
