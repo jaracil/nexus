@@ -110,12 +110,6 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 		})
 		req.Result(ei.M{"ok": true, "user": nc.user.User, "connId": nc.connId})
 
-	case "sys.reload":
-		if done, errcode := nc.reload(true); !done {
-			req.Error(errcode, "", nil)
-		} else {
-			req.Result(ei.M{"ok": true})
-		}
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
 	}
