@@ -23,6 +23,9 @@ type LoginResponse struct {
 
 func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 	switch req.Method {
+	case "sys.version":
+		req.Result(ei.M{"version": Version})
+		
 	case "sys.ping":
 		req.Result("pong")
 
