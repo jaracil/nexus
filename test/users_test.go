@@ -134,9 +134,9 @@ func TestUserTags(t *testing.T) {
 		t.Errorf("user.delTags: %s", err.Error())
 	}
 
-	_, err = sesA.Exec("sys.reload", nil)
+	_, err = sesA.Exec("sys.session.reload", map[string]interface{}{"connId": sesA.Id()})
 	if err != nil {
-		t.Errorf("sys.reload: %s", err.Error())
+		t.Errorf("sys.session.reload: %s", err.Error())
 	}
 
 	_, _, err = sesA.ExecNoWait("task.push", map[string]interface{}{
