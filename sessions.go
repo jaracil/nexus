@@ -70,8 +70,16 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 		}
 		term := r.Table("sessions").
 			Between(prefix, prefix+"\uffff", r.BetweenOpts{Index: "users"}).
+			Map(func(row r.Term) interface{} {
+				return ei.M{"user": row.Field("user"),
+					"connid":        row.Field("id"),
+					"nodeId":        row.Field("nodeId"),
+					"remoteAddress": row.Field("remoteAddress"),
+					"creationTime":  row.Field("creationTime"),
+					"protocol":      row.Field("protocol")}
+			}).
 			Group("user").
-			Pluck("id", "nodeId", "remoteAddress", "creationTime", "protocol").
+			Pluck("connid", "nodeId", "remoteAddress", "creationTime", "protocol").
 			Filter(r.Row.Field("protocol").Ne("internal"))
 
 		if skip >= 0 {
@@ -84,7 +92,9 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 
 		cur, err := term.Ungroup().
 			Map(func(row r.Term) interface{} {
-				return ei.M{"user": row.Field("group"), "sessions": row.Field("reduction"), "n": row.Field("reduction").Count()}
+				return ei.M{"user": row.Field("group"),
+					"sessions": row.Field("reduction"),
+					"n":        row.Field("reduction").Count()}
 			}).Run(db)
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
@@ -101,13 +111,13 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 		fallthrough
 	case "sys.session.reload":
 		action := req.Method[12:]
-		prefix := ei.N(req.Params).M("connId").StringZ()
+		prefix := ei.N(req.Params).M("connid").StringZ()
 
 		if len(prefix) < 16 {
 			req.Error(ErrInvalidParams, "", nil)
 			return
 		}
-		
+
 		if action == "reload" && prefix == nc.connId {
 			if done, errcode := nc.reload(true); !done {
 				req.Error(errcode, "", nil)

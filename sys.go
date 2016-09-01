@@ -25,17 +25,19 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 	switch req.Method {
 	case "sys.version":
 		req.Result(ei.M{"version": Version})
-		
+
 	case "sys.ping":
-		req.Result("pong")
+		req.Result(ei.M{"ok": true})
 
 	case "sys.watchdog":
-		wdt := ei.N(req.Params).Int64Z()
-		if wdt < 10 {
-			wdt = 10
+		wdt, err := ei.N(req.Params).M("watchdog").Lower().Int64()
+		if err == nil {
+			if wdt < 10 {
+				wdt = 10
+			}
+			atomic.StoreInt64(&nc.wdog, wdt)
 		}
-		atomic.StoreInt64(&nc.wdog, wdt)
-		req.Result(ei.M{"ok": true, "watchdog": wdt})
+		req.Result(ei.M{"watchdog": nc.wdog})
 
 	case "sys.login":
 		var user string
@@ -100,13 +102,13 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 		}))
 		nc.updateSession()
 		hook("user", ud.User, ud.User, ei.M{
-			"action": "login",
-			"user": nc.user.User,
-			"mask": nc.user.Mask,
-			"tags": nc.user.Tags,
+			"action":      "login",
+			"user":        nc.user.User,
+			"mask":        nc.user.Mask,
+			"tags":        nc.user.Tags,
 			"maxSessions": nc.user.MaxSessions,
-			"whitelist": nc.user.Whitelist,
-			"blacklist": nc.user.Blacklist,		
+			"whitelist":   nc.user.Whitelist,
+			"blacklist":   nc.user.Blacklist,
 		})
 		req.Result(ei.M{"ok": true, "user": nc.user.User, "connId": nc.connId})
 
