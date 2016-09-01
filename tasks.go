@@ -55,14 +55,14 @@ func taskPurge() {
 						task := ei.N(change.OldValue)
 						if path := task.M("path").StringZ(); !strings.HasPrefix(path, "@pull.") {
 							hook("task", path+task.M("method").StringZ(), task.M("user").StringZ(), ei.M{
-								"action": "timeout",
-								"id": task.M("id").StringZ(),
+								"action":    "timeout",
+								"id":        task.M("id").StringZ(),
 								"timestamp": time.Now().UTC(),
 							})
 						}
 					}
 				}
-				
+
 				r.Table("tasks").
 					Between(r.MinVal, r.Now(), r.BetweenOpts{Index: "deadLine"}).
 					Filter(r.Row.Field("stat").Eq("done")).
@@ -164,11 +164,11 @@ func taskPull(task *Task) bool {
 				break
 			}
 			hook("task", newTask.M("path").StringZ()+newTask.M("method").StringZ(), newTask.M("user").StringZ(), ei.M{
-				"action": "pull",
-				"id": result["taskid"],
-				"connId": task.Id[0:16],
-				"user": task.User,
-				"ttl": newTask.M("ttl").IntZ(),
+				"action":    "pull",
+				"id":        result["taskid"],
+				"connId":    task.Id[0:16],
+				"user":      task.User,
+				"ttl":       newTask.M("ttl").IntZ(),
 				"timestamp": time.Now().UTC(),
 			})
 			return true
@@ -225,8 +225,8 @@ func taskExpireTtl(taskid string) {
 		for _, change := range wres.Changes {
 			task := ei.N(change.OldValue)
 			hook("task", task.M("path").StringZ()+task.M("method").StringZ(), task.M("user").StringZ(), ei.M{
-				"action": "ttlExpired",
-				"id": task.M("id").StringZ(),
+				"action":    "ttlExpired",
+				"id":        task.M("id").StringZ(),
 				"timestamp": time.Now().UTC(),
 			})
 		}
@@ -284,19 +284,19 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			return
 		}
 		hook("task", task.Path+task.Method, task.User, ei.M{
-			"action": "push",
-			"id": task.Id,
-			"connId": nc.connId,
-			"user": nc.user.User,
-			"tags": nc.user.Tags,
-			"path": path,
-			"method": met,
-			"params": params,
-			"detach": detach,
-			"ttl": ttl,
-			"prio": prio,
+			"action":    "push",
+			"id":        task.Id,
+			"connId":    nc.connId,
+			"user":      nc.user.User,
+			"tags":      nc.user.Tags,
+			"path":      path,
+			"method":    met,
+			"params":    params,
+			"detach":    detach,
+			"ttl":       ttl,
+			"prio":      prio,
 			"timestamp": time.Now().UTC(),
-			"timeout": timeout,
+			"timeout":   timeout,
 		})
 		if detach {
 			req.Result(ei.M{"ok": true})
@@ -353,9 +353,9 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		if res.Replaced > 0 {
 			task := ei.N(res.Changes[0].OldValue)
 			hook("task", task.M("path").StringZ()+task.M("method").StringZ(), task.M("user").StringZ(), ei.M{
-				"action": "result",
-				"id": taskid,
-				"result": result,
+				"action":    "result",
+				"id":        taskid,
+				"result":    result,
 				"timestamp": time.Now().UTC(),
 			})
 			req.Result(ei.M{"ok": true})
@@ -379,11 +379,11 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		if res.Replaced > 0 {
 			task := ei.N(res.Changes[0].OldValue)
 			hook("task", task.M("path").StringZ()+task.M("method").StringZ(), task.M("user").StringZ(), ei.M{
-				"action": "error",
-				"id": taskid,
-				"code": code,
-				"message": message,
-				"data": data,
+				"action":    "error",
+				"id":        taskid,
+				"code":      code,
+				"message":   message,
+				"data":      data,
 				"timestamp": time.Now().UTC(),
 			})
 			req.Result(ei.M{"ok": true})
@@ -404,8 +404,8 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		if res.Replaced > 0 {
 			task := ei.N(res.Changes[0].OldValue)
 			hook("task", task.M("path").StringZ()+task.M("method").StringZ(), task.M("user").StringZ(), ei.M{
-				"action": "reject",
-				"id": taskid,
+				"action":    "reject",
+				"id":        taskid,
 				"timestamp": time.Now().UTC(),
 			})
 			req.Result(ei.M{"ok": true})
@@ -431,8 +431,8 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		if wres.Replaced > 0 {
 			task := ei.N(wres.Changes[0].NewValue)
 			hook("task", task.M("path").StringZ()+task.M("method").StringZ(), task.M("user").StringZ(), ei.M{
-				"action": "cancel",
-				"id": task.M("taskid").StringZ(),
+				"action":    "cancel",
+				"id":        task.M("taskid").StringZ(),
 				"timestamp": time.Now().UTC(),
 			})
 			req.Result(ei.M{"ok": true})

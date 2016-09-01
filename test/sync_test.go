@@ -58,7 +58,7 @@ func TestSyncLockFail(t *testing.T) {
 	}
 
 	time.Sleep(time.Millisecond * 100)
-	
+
 	// Fail to lock from another session
 	if done, err := sesb.Lock(Prefix3); err != nil {
 		t.Errorf("sync.lock: %s", err.Error())
