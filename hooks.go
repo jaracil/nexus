@@ -1,14 +1,14 @@
 package main
 
 import (
-	"strings"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	r "github.com/dancannon/gorethink"
-	. "github.com/jaracil/nexus/log"
 	"github.com/jaracil/ei"
+	. "github.com/jaracil/nexus/log"
 )
 
 type HookBans struct {
@@ -22,7 +22,7 @@ type HookCache struct {
 }
 
 type HookCacheItem struct {
-	List []interface{}
+	List   []interface{}
 	Expire time.Time
 }
 
@@ -86,14 +86,14 @@ func hookPublish(ty string, path string, user string, message interface{}) (int,
 
 func hook(ty string, path string, user string, data interface{}) {
 	if hookIsBanned(ty, path, user) {
-		return	
+		return
 	}
 	switch ty {
-		case "task", "user":
-			n, _ := hookPublish(ty, path, user, data)
-			if n == 0 {
-				hookBan(ty, path, user)
-			}
+	case "task", "user":
+		n, _ := hookPublish(ty, path, user, data)
+		if n == 0 {
+			hookBan(ty, path, user)
+		}
 	}
 }
 
@@ -146,7 +146,7 @@ func hookUnban(ty string, path string, user string) {
 
 func normalizeHookPath(s string) (string, bool) {
 	if s == "" || s == "*" {
-		return "", true	
+		return "", true
 	}
 	recursive := strings.HasSuffix(s, ".*")
 	return strings.TrimRight(s, "*."), recursive

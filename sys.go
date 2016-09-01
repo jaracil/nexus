@@ -25,7 +25,7 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 	switch req.Method {
 	case "sys.version":
 		req.Result(ei.M{"version": Version})
-		
+
 	case "sys.ping":
 		req.Result("pong")
 
@@ -100,13 +100,13 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 		}))
 		nc.updateSession()
 		hook("user", ud.User, ud.User, ei.M{
-			"action": "login",
-			"user": nc.user.User,
-			"mask": nc.user.Mask,
-			"tags": nc.user.Tags,
+			"action":      "login",
+			"user":        nc.user.User,
+			"mask":        nc.user.Mask,
+			"tags":        nc.user.Tags,
 			"maxSessions": nc.user.MaxSessions,
-			"whitelist": nc.user.Whitelist,
-			"blacklist": nc.user.Blacklist,		
+			"whitelist":   nc.user.Whitelist,
+			"blacklist":   nc.user.Blacklist,
 		})
 		req.Result(ei.M{"ok": true, "user": nc.user.User, "connId": nc.connId})
 

@@ -14,12 +14,12 @@ var opts struct {
 }
 
 type RethinkOptions struct {
-	Host       string `short:"r" long:"rethinkdb" description:"RethinkDB host[:port]" default:"localhost:28015"`
-	Database   string `short:"d" long:"database" description:"RethinkDB database" default:"nexus"`
-	MaxIdle    int    `long:"maxidle" description:"Max RethinkDB idle connections" default:"50"`
-	MaxOpen    int    `long:"maxopen" description:"Max RethinkDB open connections" default:"200"`
-	DefPipeLen int    `long:"defpipelen" description:"Default pipe length" default:"1000"`
-	MaxPipeLen int    `long:"maxpipelen" description:"Max pipe length" default:"100000"`
+	Hosts      []string `short:"r" long:"rethinkdb" description:"RethinkDB host[:port]" default:"localhost:28015"`
+	Database   string   `short:"d" long:"database" description:"RethinkDB database" default:"nexus"`
+	MaxIdle    int      `long:"maxidle" description:"Max RethinkDB idle connections" default:"50"`
+	MaxOpen    int      `long:"maxopen" description:"Max RethinkDB open connections" default:"200"`
+	DefPipeLen int      `long:"defpipelen" description:"Default pipe length" default:"1000"`
+	MaxPipeLen int      `long:"maxpipelen" description:"Max pipe length" default:"100000"`
 }
 
 type SSLOptions struct {

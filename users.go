@@ -1,9 +1,9 @@
 package main
 
 import (
-	"strings"
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
+	"strings"
 )
 
 type UserData struct {
@@ -59,8 +59,8 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		}
 		hook("user", user, nc.user.User, ei.M{
 			"action": "create",
-			"user": user,
-			"pass": pass,
+			"user":   user,
+			"pass":   pass,
 		})
 		req.Result(map[string]interface{}{"ok": true})
 
@@ -83,7 +83,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		if res.Deleted > 0 {
 			hook("user", user, nc.user.User, ei.M{
 				"action": "delete",
-				"user": user,
+				"user":   user,
 			})
 			req.Result(map[string]interface{}{"ok": true})
 		} else {
@@ -121,11 +121,11 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			return
 		}
 		hook("user", user, nc.user.User, ei.M{
-			"action": "setTags",
-			"user": user,
-			"prefix": prefix,
+			"action":  "setTags",
+			"user":    user,
+			"prefix":  prefix,
 			"addTags": tgs,
-			"tags": ei.N(res.Changes[0].NewValue).M("tags").MapStrZ(),
+			"tags":    ei.N(res.Changes[0].NewValue).M("tags").MapStrZ(),
 		})
 		req.Result(map[string]interface{}{"ok": true})
 	case "user.delTags":
@@ -159,11 +159,11 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			return
 		}
 		hook("user", user, nc.user.User, ei.M{
-			"action": "delTags",
-			"user": user,
-			"prefix": prefix,
+			"action":  "delTags",
+			"user":    user,
+			"prefix":  prefix,
 			"delTags": tgs,
-			"tags": ei.N(res.Changes[0].NewValue).M("tags").MapStrZ(),
+			"tags":    ei.N(res.Changes[0].NewValue).M("tags").MapStrZ(),
 		})
 		req.Result(map[string]interface{}{"ok": true})
 
@@ -200,8 +200,8 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		}
 		hook("user", user, nc.user.User, ei.M{
 			"action": "setPass",
-			"user": user,
-			"pass": pass,
+			"user":   user,
+			"pass":   pass,
 		})
 		req.Result(map[string]interface{}{"ok": true})
 
@@ -360,8 +360,8 @@ func (nc *NexusConn) userChangeParam(req *JsonRpcReq, param interface{}, field, 
 	}
 	hook("user", user, nc.user.User, ei.M{
 		"action": strings.TrimPrefix(req.Method, "user."),
-		action: param,
-		field: ei.N(res.Changes[0].NewValue).M(field),
+		action:   param,
+		field:    ei.N(res.Changes[0].NewValue).M(field),
 	})
 	req.Result(map[string]interface{}{"ok": true})
 }

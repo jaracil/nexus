@@ -107,7 +107,7 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidParams, "", nil)
 			return
 		}
-		
+
 		if action == "reload" && prefix == nc.connId {
 			if done, errcode := nc.reload(true); !done {
 				req.Error(errcode, "", nil)
