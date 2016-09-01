@@ -137,14 +137,14 @@ Else, the specified method should document which fields its expecting
       "result": { "ok": true, "connid": <string>, "user": <string> }
 
 ## sys.node.list
-List the nexus nodes connected to the cluster. Includes some info about connected clients and CPU load for each node.
+List the nexus nodes connected to the cluster. Includes some info about connected clients, api version and CPU load for each node.
 
 ### Parameters:
 * `"limit": <Number>` - *Optional* - Limit the number of results. Defaults to 100
 * `"skip": <Number>` - *Optional* - Skips a number of results. Defaults to 0
 
 ### Result:
-     "result": [ {"id": <string>, "clients": <Number>, "load": {"load1": <Number>, "load5": <Number>, "load15": <Number>}}, ... ]
+     "result": [ {"id": <string>, "version": <String>, "clients": <Number>, "load": {"load1": <Number>, "load5": <Number>, "load15": <Number>}}, ... ]
 
 ## sys.session.list
 List the active sessions for an user prefix on the cluster.
