@@ -7,10 +7,11 @@ import (
 )
 
 var opts struct {
-	Verbose   bool           `short:"v" long:"verbose" description:"Show debug information"`
-	Listeners []string       `short:"l" long:"listen"  description:"Listen on (tcp|ssl|http|https)://addr:port" default:"tcp://0.0.0.0:1717"`
-	Rethink   RethinkOptions `group:"RethinkDB Options"`
-	SSL       SSLOptions     `group:"SSL Options"`
+	Verbose      bool           `short:"v" long:"verbose" description:"Show debug information"`
+	Listeners    []string       `short:"l" long:"listen"  description:"Listen on (tcp|ssl|http|https)://addr:port" default:"tcp://0.0.0.0:1717"`
+	IsProduction bool           `long:"production" description:"Enables Production mode"`
+	Rethink      RethinkOptions `group:"RethinkDB Options"`
+	SSL          SSLOptions     `group:"SSL Options"`
 }
 
 type RethinkOptions struct {

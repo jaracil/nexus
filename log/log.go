@@ -21,7 +21,6 @@ func init() {
 	customFormatter := new(logrus.TextFormatter)
 	customFormatter.FullTimestamp = true
 	customFormatter.TimestampFormat = "2006/01/02 15:04:05"
-	customFormatter.ForceColors = true
 	Log.Formatter = customFormatter
 	Log.Level = logrus.DebugLevel
 }

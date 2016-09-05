@@ -404,6 +404,14 @@ func (nc *NexusConn) updateSession() {
 
 var numconn int64
 
+type JsonRpcReqLog struct {
+	ConnID string      `json:"connid"`
+	Method string      `json:"method"`
+	Params interface{} `json:"params"`
+	Remote string      `json:"remoteAddr"`
+	ID     interface{} `json:"id"`
+}
+
 func (nc *NexusConn) handle() {
 
 	if nc.proto != "internal" {
@@ -432,11 +440,17 @@ func (nc *NexusConn) handle() {
 		}
 
 		if (req.Method != "sys.ping" && nc.proto != "internal") || LogLevelIs(DebugLevel) {
-			params, err := json.Marshal(req.Params)
-			if err != nil {
-				Log.Printf("[%s@%s] %s: %#v - id: %.0f", req.nc.connId, req.nc.conn.RemoteAddr(), req.Method, req.Params, req.Id)
+			if opts.IsProduction {
+				d := JsonRpcReqLog{ID: req.Id, ConnID: req.nc.connId, Method: req.Method, Params: req.Params, Remote: req.nc.conn.RemoteAddr().String()}
+				marshalled, _ := json.Marshal(d)
+				Log.Printf(fmt.Sprintf("%s", marshalled))
 			} else {
-				Log.Printf("[%s@%s] %s: %s - id: %.0f", req.nc.connId, req.nc.conn.RemoteAddr(), req.Method, params, req.Id)
+				marshalled, err := json.Marshal(req.Params)
+				if err != nil {
+					Log.Printf("[%s@%s] %s: %#v - id: %.0f", req.nc.connId, req.nc.conn.RemoteAddr(), req.Method, req.Params, req.Id)
+				} else {
+					Log.Printf("[%s@%s] %s: %s - id: %.0f", req.nc.connId, req.nc.conn.RemoteAddr(), req.Method, marshalled, req.Id)
+				}
 			}
 		}
 

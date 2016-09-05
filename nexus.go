@@ -68,6 +68,10 @@ func main() {
 	}
 
 	nodeId = safeId(4)
+	if opts.IsProduction {
+		Log.Formatter = ProductionFormatter{NodeID: nodeId}
+	}
+
 	signal.Notify(sigChan)
 	go signalManager()
 
