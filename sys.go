@@ -23,11 +23,11 @@ type LoginResponse struct {
 
 func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 	switch req.Method {
-	case "sys.version":
-		req.Result(ei.M{"version": Version})
-
 	case "sys.ping":
 		req.Result(ei.M{"ok": true})
+
+	case "sys.version":
+		req.Result(ei.M{"version": Version})
 
 	case "sys.watchdog":
 		wdt, err := ei.N(req.Params).M("watchdog").Lower().Int64()
@@ -110,7 +110,7 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 			"whitelist":   nc.user.Whitelist,
 			"blacklist":   nc.user.Blacklist,
 		})
-		req.Result(ei.M{"ok": true, "user": nc.user.User, "connId": nc.connId})
+		req.Result(ei.M{"ok": true, "user": nc.user.User, "connid": nc.connId})
 
 	default:
 		req.Error(ErrMethodNotFound, "", nil)

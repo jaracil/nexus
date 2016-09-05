@@ -46,9 +46,9 @@ func taskPurge() {
 				wres, err := r.Table("tasks").
 					Between(r.MinVal, r.Now(), r.BetweenOpts{Index: "deadLine"}).
 					Update(r.Branch(r.Row.Field("stat").Ne("done"),
-						ei.M{"stat": "done", "errCode": ErrTimeout, "errStr": ErrStr[ErrTimeout], "deadLine": r.Now().Add(600)},
-						ei.M{}),
-						r.UpdateOpts{ReturnChanges: true}).
+					ei.M{"stat": "done", "errCode": ErrTimeout, "errStr": ErrStr[ErrTimeout], "deadLine": r.Now().Add(600)},
+					ei.M{}),
+					r.UpdateOpts{ReturnChanges: true}).
 					RunWrite(db, r.RunOpts{Durability: "soft"})
 				if err == nil {
 					for _, change := range wres.Changes {
@@ -132,9 +132,9 @@ func taskPull(task *Task) bool {
 			Between(ei.S{prefix, "waiting", r.MinVal, r.MinVal}, ei.S{prefix, "waiting", r.MaxVal, r.MaxVal}, r.BetweenOpts{RightBound: "closed", Index: "pspc"}).
 			Limit(1).
 			Update(r.Branch(r.Row.Field("stat").Eq("waiting"),
-				ei.M{"stat": "working", "tses": task.Id[0:16]},
-				ei.M{}),
-				r.UpdateOpts{ReturnChanges: true}).
+			ei.M{"stat": "working", "tses": task.Id[0:16]},
+			ei.M{}),
+			r.UpdateOpts{ReturnChanges: true}).
 			RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
 			break
@@ -153,8 +153,8 @@ func taskPull(task *Task) bool {
 			pres, err := r.Table("tasks").
 				Get(task.Id).
 				Update(r.Branch(r.Row.Field("stat").Eq("working"),
-					ei.M{"stat": "done", "result": result, "deadLine": r.Now().Add(600)},
-					ei.M{})).
+				ei.M{"stat": "done", "result": result, "deadLine": r.Now().Add(600)},
+				ei.M{})).
 				RunWrite(db, r.RunOpts{Durability: "soft"})
 			if err != nil || pres.Replaced != 1 {
 				r.Table("tasks").
@@ -166,7 +166,7 @@ func taskPull(task *Task) bool {
 			hook("task", newTask.M("path").StringZ()+newTask.M("method").StringZ(), newTask.M("user").StringZ(), ei.M{
 				"action":    "pull",
 				"id":        result["taskid"],
-				"connId":    task.Id[0:16],
+				"connid":    task.Id[0:16],
 				"user":      task.User,
 				"ttl":       newTask.M("ttl").IntZ(),
 				"timestamp": time.Now().UTC(),
@@ -181,8 +181,8 @@ func taskPull(task *Task) bool {
 	r.Table("tasks").
 		Get(task.Id).
 		Update(r.Branch(r.Row.Field("stat").Eq("working"),
-			ei.M{"stat": "waiting"},
-			ei.M{})).
+		ei.M{"stat": "waiting"},
+		ei.M{})).
 		RunWrite(db, r.RunOpts{Durability: "soft"})
 	return false
 }
@@ -191,12 +191,12 @@ func taskWakeup(task *Task) bool {
 	for {
 		wres, err := r.Table("tasks").
 			Between(ei.S{"@pull." + task.Path, "waiting", r.MinVal, r.MinVal},
-				ei.S{"@pull." + task.Path, "waiting", r.MaxVal, r.MaxVal},
-				r.BetweenOpts{RightBound: "closed", Index: "pspc"}).
+			ei.S{"@pull." + task.Path, "waiting", r.MaxVal, r.MaxVal},
+			r.BetweenOpts{RightBound: "closed", Index: "pspc"}).
 			Sample(1).
 			Update(r.Branch(r.Row.Field("stat").Eq("waiting"),
-				ei.M{"stat": "working"},
-				ei.M{})).
+			ei.M{"stat": "working"},
+			ei.M{})).
 			RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
 			return false
@@ -286,7 +286,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		hook("task", task.Path+task.Method, task.User, ei.M{
 			"action":    "push",
 			"id":        task.Id,
-			"connId":    nc.connId,
+			"connid":    nc.connId,
 			"user":      nc.user.User,
 			"tags":      nc.user.Tags,
 			"path":      path,
@@ -419,9 +419,9 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			Between(nc.connId, nc.connId+"\uffff").
 			Filter(r.Row.Field("localId").Eq(id)).
 			Update(r.Branch(r.Row.Field("stat").Ne("done"),
-				ei.M{"stat": "done", "errCode": ErrCancel, "errStr": ErrStr[ErrCancel], "deadLine": r.Now().Add(600)},
-				ei.M{}),
-				r.UpdateOpts{ReturnChanges: true}).
+			ei.M{"stat": "done", "errCode": ErrCancel, "errStr": ErrStr[ErrCancel], "deadLine": r.Now().Add(600)},
+			ei.M{}),
+			r.UpdateOpts{ReturnChanges: true}).
 			RunWrite(db, r.RunOpts{Durability: "soft"})
 
 		if err != nil {
@@ -465,7 +465,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			term = term.Skip(skip)
 		}
 
-		if limit >= 0 {
+		if limit > 0 {
 			term = term.Limit(limit)
 		}
 

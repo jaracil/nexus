@@ -6,17 +6,19 @@
   * `user.addBlacklist`
   * `user.delBlacklist`
   * `user.setMaxSessions`
+  * `sys.version`
   * New error code `-32006 - ErrLockNotOwned` available for the Sync operations
 
 
 ### Modified:
+  * `sys.node.list` return value now has nexus version (check [sys.node.list](#sysnodelist))
   * `task.list` returns value improved (check [task.list](#tasklist))
   * `sys.session.list` field `id` renamed to `connid`
   * `sys.session.kick` field `connId` renamed to `connid`
   * `sys.session.reload` field `connId` renamed to `connid`
   * `sys.watchdog` parameter made optional, and put into a map
   * `sync.lock` and `sync.unlock` return error `-32006` on unsuccessful lock/unlock instead of `"ok":false`
-  * `sys.ping`, `sys.node.list`, `sys.session.list`, `sys.session.kick`, `sys.session.reload`, `pipe.create`, `task.pull`, `task.list`, `user.list` and `task.push` include an `"ok": true` on successful operations
+  * `sys.ping` returns an `"ok": true` on success
 
 
 ### Deprecates:
@@ -57,6 +59,7 @@
 # API Table of Contents
   * [System](#system)
     * [sys.ping](#sysping)
+	* [sys.version](#sysversion)
     * [sys.watchdog](#syswatchdog)
     * [sys.login](#syslogin)
     * [sys.node.list](#sysnodelist)
@@ -109,6 +112,15 @@ Test the connection or generate some traffic to keep the connection alive.
 ### Result:
     "result": { "ok": true }
 
+## sys.version
+Returns the semantic version of the node.
+
+### Parameter:
+ * `null`
+
+### Result:
+    "result": { "version": "0.2.0" }
+
 ## sys.watchdog
 Configure the time the connection will be considered alive without traffic.
 
@@ -137,7 +149,7 @@ Else, the specified method should document which fields its expecting
       "result": { "ok": true, "connid": <string>, "user": <string> }
 
 ## sys.node.list
-List the nexus nodes connected to the cluster. Includes some info about connected clients, api version and CPU load for each node.
+List the nexus nodes connected to the cluster. Includes some info about connected clients, CPU load and nexus version for each node.
 
 ### Parameters:
 * `"limit": <Number>` - *Optional* - Limit the number of results. Defaults to 100
@@ -155,7 +167,7 @@ List the active sessions for an user prefix on the cluster.
 * `"skip": <Number>` - *Optional* - Skips a number of results. Defaults to 0
 
 ### Result:
-    "result": [{"sessions":[{"creationTime":"2016-08-30T12:39:16.39Z","connid":"687c3b7baf4b9471","nodeId":"687c3b7b","protocol":"tcp","remoteAddress":"172.17.0.1:51398"},{"creationTime":"2016-08-30T12:39:21.283Z","id":"687c3b7b407bcce2","nodeId":"687c3b7b","protocol":"tcp","remoteAddress":"172.17.0.1:51402"}],"user":"root","n":2}, ...]
+    "result": [{"sessions":[{"creationTime":"2016-08-30T12:39:16.39Z","connid":"687c3b7baf4b9471","nodeid":"687c3b7b","protocol":"tcp","remoteAddress":"172.17.0.1:51398"},{"creationTime":"2016-08-30T12:39:21.283Z","id":"687c3b7b407bcce2","nodeid":"687c3b7b","protocol":"tcp","remoteAddress":"172.17.0.1:51402"}],"user":"root","n":2}, ...]
 
 ## sys.session.kick
 Terminates any connection which session id matches the prefix

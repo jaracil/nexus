@@ -1,9 +1,10 @@
 package main
 
 import (
+	"strings"
+
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
-	"strings"
 )
 
 type UserData struct {
@@ -228,7 +229,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			term = term.Skip(skip)
 		}
 
-		if limit >= 0 {
+		if limit > 0 {
 			term = term.Limit(limit)
 		}
 

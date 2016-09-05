@@ -23,13 +23,17 @@ func (nc *NexusConn) handleSyncReq(req *JsonRpcReq) {
 			RunWrite(db, r.RunOpts{Durability: "hard"})
 		if err != nil {
 			if r.IsConflictErr(err) {
-				req.Result(ei.M{"ok": false})
+				req.Error(ErrLockNotOwned, "", nil)
 			} else {
 				req.Error(ErrInternal, "", nil)
 			}
 			return
 		}
-		req.Result(ei.M{"ok": res.Inserted > 0})
+		if res.Inserted <= 0 {
+			req.Error(ErrLockNotOwned, "", nil)
+			return
+		}
+		req.Result(ei.M{"ok": true})
 	case "sync.unlock":
 		lock, err := ei.N(req.Params).M("lock").String()
 		if err != nil {
@@ -51,7 +55,11 @@ func (nc *NexusConn) handleSyncReq(req *JsonRpcReq) {
 			req.Error(ErrInternal, err.Error(), nil)
 			return
 		}
-		req.Result(ei.M{"ok": res.Deleted > 0})
+		if res.Deleted <= 0 {
+			req.Error(ErrLockNotOwned, "", nil)
+			return
+		}
+		req.Result(ei.M{"ok": true})
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
 	}

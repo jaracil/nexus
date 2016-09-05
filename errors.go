@@ -32,4 +32,5 @@ var ErrStr = map[int]string{
 	ErrUserExists:       "User already exists",
 	ErrPermissionDenied: "Permission denied",
 	ErrTtlExpired:       "TTL expired",
+	ErrLockNotOwned: 	 "Lock not owned",
 }

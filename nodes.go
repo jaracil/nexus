@@ -157,7 +157,7 @@ func (nc *NexusConn) handleNodesReq(req *JsonRpcReq) {
 			term = term.Skip(skip)
 		}
 
-		if limit >= 0 {
+		if limit > 0 {
 			term = term.Limit(limit)
 		}
 

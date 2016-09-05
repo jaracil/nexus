@@ -1,9 +1,10 @@
 package test
 
 import (
-	nexus "github.com/jaracil/nxcli/nxcore"
 	"testing"
 	"time"
+
+	nexus "github.com/jaracil/nxcli/nxcore"
 )
 
 func TestUserCreateFail(t *testing.T) {
