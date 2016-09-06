@@ -32,7 +32,7 @@ func nodeTrack() {
 		"id":       nodeId,
 		"deadline": r.Now().Add(10),
 		"kill":     false,
-		"version":  Version,
+		"version":  Version.String(),
 	}
 	_, err := r.Table("nodes").Insert(ndata).RunWrite(db)
 	if err != nil {

@@ -27,7 +27,7 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 		req.Result(ei.M{"ok": true})
 
 	case "sys.version":
-		req.Result(ei.M{"version": Version})
+		req.Result(ei.M{"version": Version.String()})
 
 	case "sys.watchdog":
 		wdt, err := ei.N(req.Params).M("watchdog").Lower().Int64()
