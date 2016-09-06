@@ -5,8 +5,8 @@ import (
 )
 
 var _version = &version{
-	Major: 0,
-	Minor: 2,
+	Major: 1,
+	Minor: 0,
 	Patch: 0,
 }
 
