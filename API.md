@@ -1,5 +1,5 @@
 # Versions
-## 0.2.0
+## 1.0.0
 ### New:
   * `user.addWhitelist`
   * `user.delWhitelist`
@@ -11,7 +11,7 @@
 
 
 ### Modified:
-  * `sys.node.list` return value now has nexus version (check [sys.node.list](#sysnodelist))
+  * `sys.node.list` return value now includes the api version (check [sys.node.list](#sysnodelist))
   * `task.list` returns value improved (check [task.list](#tasklist))
   * `sys.session.list` field `id` renamed to `connid`
   * `sys.session.kick` field `connId` renamed to `connid`
