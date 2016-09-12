@@ -1,9 +1,10 @@
 package test
 
 import (
-	nexus "github.com/jaracil/nxcli/nxcore"
 	"testing"
 	"time"
+
+	nexus "github.com/nayarsystems/nxgo/nxcore"
 )
 
 func TestUserCreateFail(t *testing.T) {
@@ -81,7 +82,7 @@ func TestUserTags(t *testing.T) {
 	if err != nil {
 		t.Errorf("user.login: %s", err.Error())
 	}
-	
+
 	_, err = RootSes.UserSetTags(UserA, Prefix1, map[string]interface{}{
 		"test":   1,
 		"prueba": []string{"vaya", "vaya"},
@@ -97,9 +98,9 @@ func TestUserTags(t *testing.T) {
 	if err != nil {
 		t.Errorf("session.reload: %s", err.Error())
 	}
-	
+
 	time.Sleep(time.Second)
-	
+
 	_, _, err = sesA.ExecNoWait("task.push", map[string]interface{}{
 		"method": Prefix1 + ".method",
 		"params": "hello",
@@ -134,9 +135,9 @@ func TestUserTags(t *testing.T) {
 		t.Errorf("user.delTags: %s", err.Error())
 	}
 
-	_, err = sesA.Exec("sys.reload", nil)
+	_, err = sesA.Exec("sys.session.reload", map[string]interface{}{"connid": sesA.Id()})
 	if err != nil {
-		t.Errorf("sys.reload: %s", err.Error())
+		t.Errorf("sys.session.reload: %s", err.Error())
 	}
 
 	_, _, err = sesA.ExecNoWait("task.push", map[string]interface{}{

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -11,6 +12,7 @@ import (
 
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
+	. "github.com/jaracil/nexus/log"
 	"github.com/jaracil/nxcli/nxcore"
 )
 
@@ -22,15 +24,20 @@ type LoginResponse struct {
 func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 	switch req.Method {
 	case "sys.ping":
-		req.Result("pong")
+		req.Result(ei.M{"ok": true})
+
+	case "sys.version":
+		req.Result(ei.M{"version": Version.String()})
 
 	case "sys.watchdog":
-		wdt := ei.N(req.Params).Int64Z()
-		if wdt < 10 {
-			wdt = 10
+		wdt, err := ei.N(req.Params).M("watchdog").Lower().Int64()
+		if err == nil {
+			if wdt < 10 {
+				wdt = 10
+			}
+			atomic.StoreInt64(&nc.wdog, wdt)
 		}
-		atomic.StoreInt64(&nc.wdog, wdt)
-		req.Result(ei.M{"ok": true, "watchdog": wdt})
+		req.Result(ei.M{"watchdog": nc.wdog})
 
 	case "sys.login":
 		var user string
@@ -41,7 +48,7 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 		switch method {
 		case "", "basic":
 			var err int
-			user, mask, err = nc.BasicAuth(req.Params)
+			user, _, err = nc.BasicAuth(req.Params)
 			if err != ErrNoError {
 				req.Error(err, "", nil)
 				return
@@ -71,22 +78,40 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 			mask = loginResponse.Tags
 		}
 
+		// Check user limits
+
 		ud, err := loadUserData(user)
 		if err != ErrNoError {
 			req.Error(err, "", nil)
 			return
 		}
 
-		atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(&UserData{User: ud.User, Mask: mask, Tags: maskTags(ud.Tags, mask)}))
-
-		nc.updateSession()
-		req.Result(ei.M{"ok": true, "user": nc.user.User, "connId": nc.connId})
-	case "sys.reload":
-		if done, errcode := nc.reload(true); !done {
-			req.Error(errcode, "", nil)
-		} else {
-			req.Result(ei.M{"ok": true})
+		if !nc.checkUserLimits(ud) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
 		}
+
+		// LOGGED IN!
+		atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(&UserData{
+			User:        ud.User,
+			Mask:        mask,
+			Tags:        maskTags(ud.Tags, mask),
+			MaxSessions: ud.MaxSessions,
+			Whitelist:   ud.Whitelist,
+			Blacklist:   ud.Blacklist,
+		}))
+		nc.updateSession()
+		hook("user", ud.User, ud.User, ei.M{
+			"action":      "login",
+			"user":        nc.user.User,
+			"mask":        nc.user.Mask,
+			"tags":        nc.user.Tags,
+			"maxSessions": nc.user.MaxSessions,
+			"whitelist":   nc.user.Whitelist,
+			"blacklist":   nc.user.Blacklist,
+		})
+		req.Result(ei.M{"ok": true, "user": nc.user.User, "connid": nc.connId})
+
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
 	}
@@ -163,6 +188,46 @@ func mergeTags(src, dst *UserData) {
 			}
 		}
 	}
+}
+
+func (nc *NexusConn) checkUserLimits(ud *UserData) bool {
+	nci := NewInternalClient()
+	defer nci.Close()
+
+	// Max Sessions opened?
+	// soft limit because race condition checking sessions
+	sessions, err := nci.SessionList(ud.User, -1, 0)
+	seslen := 0
+	for _, u := range sessions {
+		if u.User == ud.User {
+			seslen = len(u.Sessions)
+			break
+		}
+	}
+	if err != nil || (ud.MaxSessions > 0 && seslen+1 > ud.MaxSessions) {
+		Log.Warnf("User %s has too many sessions opened: %d/%d", ud.User, seslen, ud.MaxSessions)
+		return false
+	}
+
+	remoteaddr := nc.conn.RemoteAddr().String()
+
+	// Whitelisted?
+	for _, wr := range ud.Whitelist {
+		if match, err := regexp.MatchString(wr, remoteaddr); err == nil && match {
+			Log.Warnf("User %s from %s whitelisted by %s", ud.User, remoteaddr, wr)
+			return true
+		}
+	}
+
+	// Blacklisted?
+	for _, br := range ud.Blacklist {
+		if match, err := regexp.MatchString(br, remoteaddr); err == nil && match {
+			Log.Warnf("User %s from %s blacklisted by %s", ud.User, remoteaddr, br)
+			return false
+		}
+	}
+
+	return true
 }
 
 func (nc *NexusConn) BasicAuth(params interface{}) (string, map[string]map[string]interface{}, int) {

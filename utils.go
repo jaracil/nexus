@@ -3,7 +3,10 @@ package main
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"reflect"
 	"strings"
 
 	"golang.org/x/crypto/scrypt"
@@ -71,4 +74,48 @@ func HashPass(pass, salt string) (string, error) {
 		return "", errors.New("scrypt error")
 	}
 	return hex.EncodeToString(bdk), nil
+}
+
+func truncateJson(j interface{}) interface{} {
+	switch t := j.(type) {
+	//Number
+	case float64:
+		return j
+
+	// Null
+	case nil:
+		return j
+
+	// Bool
+	case bool:
+		return j
+
+	// String
+	case string:
+		maxlen := 1024 * 10
+
+		if len(t) > maxlen {
+			return t[:maxlen] + "..."
+		}
+		return t
+
+	// Object
+	case map[string]interface{}:
+		a := make(map[string]interface{})
+		for k, v := range t {
+			a[k] = truncateJson(v)
+		}
+		return a
+
+	// Array?
+	default:
+		slice := make([]interface{}, 0)
+		if b, e := json.Marshal(j); e == nil && json.Unmarshal(b, &slice) == nil {
+			for k, v := range slice {
+				slice[k] = truncateJson(v)
+			}
+			return slice
+		}
+	}
+	return fmt.Sprintf("Unknown JSON type: %s", reflect.TypeOf(j))
 }

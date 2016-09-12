@@ -1,15 +1,15 @@
 package main
 
 import (
-	"regexp"
-	"github.com/jaracil/ei"
 	"errors"
+	"github.com/jaracil/ei"
+	"regexp"
 )
 
 const (
-	_userRegexp = "^[a-zA-Z][a-zA-Z0-9-_.]*"
-	_userMinLen = 3
-	_userMaxLen = 500
+	_userRegexp     = "^[a-zA-Z][a-zA-Z0-9-_.]*"
+	_userMinLen     = 3
+	_userMaxLen     = 500
 	_passwordMinLen = 4
 	_passwordMaxLen = 500
 )
@@ -44,4 +44,3 @@ func checkLen(i ei.Ei, p ...interface{}) ei.Ei {
 	}
 	return i
 }
-

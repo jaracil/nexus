@@ -26,8 +26,8 @@ func sessionTrack() {
 			Between(nodeId, nodeId+"\uffff").
 			Changes(r.ChangesOpts{IncludeInitial: true, Squash: false}).
 			Pluck(map[string]interface{}{
-				"new_val": []string{"id", "kick", "reload"},
-				"old_val": []string{"id"}}).
+			"new_val": []string{"id", "kick", "reload"},
+			"old_val": []string{"id"}}).
 			Run(db)
 		if err != nil {
 			Log.Errorf("Error opening sessionTrack iterator:%s", err.Error())
@@ -70,22 +70,32 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 		}
 		term := r.Table("sessions").
 			Between(prefix, prefix+"\uffff", r.BetweenOpts{Index: "users"}).
+			Map(func(row r.Term) interface{} {
+			return ei.M{"user": row.Field("user"),
+				"connid":        row.Field("id"),
+				"nodeid":        row.Field("nodeId"),
+				"remoteAddress": row.Field("remoteAddress"),
+				"creationTime":  row.Field("creationTime"),
+				"protocol":      row.Field("protocol")}
+		}).
 			Group("user").
-			Pluck("id", "nodeId", "remoteAddress", "creationTime", "protocol").
+			Pluck("connid", "nodeid", "remoteAddress", "creationTime", "protocol").
 			Filter(r.Row.Field("protocol").Ne("internal"))
 
 		if skip >= 0 {
 			term = term.Skip(skip)
 		}
 
-		if limit >= 0 {
+		if limit > 0 {
 			term = term.Limit(limit)
 		}
 
 		cur, err := term.Ungroup().
 			Map(func(row r.Term) interface{} {
-				return ei.M{"user": row.Field("group"), "sessions": row.Field("reduction"), "n": row.Field("reduction").Count()}
-			}).Run(db)
+			return ei.M{"user": row.Field("group"),
+				"sessions": row.Field("reduction"),
+				"n":        row.Field("reduction").Count()}
+		}).Run(db)
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
@@ -101,10 +111,19 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 		fallthrough
 	case "sys.session.reload":
 		action := req.Method[12:]
-		prefix := ei.N(req.Params).M("connId").StringZ()
+		prefix := ei.N(req.Params).M("connid").StringZ()
 
 		if len(prefix) < 16 {
 			req.Error(ErrInvalidParams, "", nil)
+			return
+		}
+
+		if action == "reload" && prefix == nc.connId {
+			if done, errcode := nc.reload(true); !done {
+				req.Error(errcode, "", nil)
+			} else {
+				req.Result(ei.M{"reloaded": 1})
+			}
 			return
 		}
 

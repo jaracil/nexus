@@ -20,7 +20,7 @@ func topicList(s string) (res []interface{}) {
 	return
 }
 
-func (nc *NexusConn) topicPublish(topic string, message interface{}) (int, error) {
+func topicPublish(topic string, message interface{}) (int, error) {
 	msg := ei.M{"topic": topic, "msg": message}
 	res, err := r.Table("pipes").
 		GetAllByIndex("subs", topicList(topic)...).
@@ -116,7 +116,7 @@ func (nc *NexusConn) handleTopicReq(req *JsonRpcReq) {
 			return
 		}
 
-		sent, err := nc.topicPublish(topic, msg)
+		sent, err := topicPublish(topic, msg)
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return

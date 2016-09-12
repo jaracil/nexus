@@ -341,7 +341,9 @@ func (nc *NexusConn) close() {
 		nc.cancelFun()
 		nc.conn.Close()
 		if mainContext.Err() == nil {
-			Log.Printf("Closing [%s] session", nc.connId)
+			if nc.proto != "internal" || LogLevelIs(DebugLevel) {
+				Log.Printf("Closing [%s] session", nc.connId)
+			}
 			dbClean(nc.connId)
 		}
 	}
@@ -356,7 +358,14 @@ func (nc *NexusConn) reload(fromSameSession bool) (bool, int) {
 		return false, ErrInternal
 	}
 
-	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(&UserData{User: ud.User, Mask: ud.Mask, Tags: maskTags(ud.Tags, ud.Mask)}))
+	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&nc.user)), unsafe.Pointer(&UserData{
+		User:        ud.User,
+		Mask:        nc.user.Mask,
+		Tags:        maskTags(ud.Tags, nc.user.Mask),
+		MaxSessions: ud.MaxSessions,
+		Whitelist:   ud.Whitelist,
+		Blacklist:   ud.Blacklist,
+	}))
 
 	if !fromSameSession {
 		wres, err := r.Table("sessions").
@@ -395,6 +404,14 @@ func (nc *NexusConn) updateSession() {
 
 var numconn int64
 
+type JsonRpcReqLog struct {
+	ConnID string      `json:"connid"`
+	Method string      `json:"method"`
+	Params interface{} `json:"params"`
+	Remote string      `json:"remoteAddr"`
+	ID     interface{} `json:"id"`
+}
+
 func (nc *NexusConn) handle() {
 
 	if nc.proto != "internal" {
@@ -416,16 +433,27 @@ func (nc *NexusConn) handle() {
 			Log.Debugf("Error on [%s] connection handler: %s", nc.connId, err)
 			break
 		}
-		params, err := json.Marshal(req.Params)
-		if err != nil {
-			Log.Printf("[%s@%s] %s: %#v - id: %.0f", req.nc.connId, req.nc.conn.RemoteAddr(), req.Method, req.Params, req.Id)
-		} else {
-			Log.Printf("[%s@%s] %s: %s - id: %.0f", req.nc.connId, req.nc.conn.RemoteAddr(), req.Method, params, req.Id)
-		}
+
 		if (req.Jsonrpc != "2.0" && req.Jsonrpc != "") || req.Method == "" { //"jsonrpc":"2.0" is optional
 			req.Error(ErrInvalidRequest, "", nil)
 			continue
 		}
+
+		if (req.Method != "sys.ping" && nc.proto != "internal") || LogLevelIs(DebugLevel) {
+			if opts.IsProduction {
+				d := JsonRpcReqLog{ID: req.Id, ConnID: req.nc.connId, Method: req.Method, Params: req.Params, Remote: req.nc.conn.RemoteAddr().String()}
+				marshalled, _ := json.Marshal(d)
+				Log.Printf(fmt.Sprintf("%s", marshalled))
+			} else {
+				marshalled, err := json.Marshal(req.Params)
+				if err != nil {
+					Log.Printf("[%s@%s] %s: %#v - id: %.0f", req.nc.connId, req.nc.conn.RemoteAddr(), req.Method, req.Params, req.Id)
+				} else {
+					Log.Printf("[%s@%s] %s: %s - id: %.0f", req.nc.connId, req.nc.conn.RemoteAddr(), req.Method, marshalled, req.Id)
+				}
+			}
+		}
+
 		go nc.handleReq(req)
 	}
 }

@@ -4,16 +4,18 @@ import (
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
+	"strings"
+	"time"
 )
 
 var db *r.Session
 
 func dbOpen() (err error) {
 	db, err = r.Connect(r.ConnectOpts{
-		Address:  opts.Rethink.Host,
-		Database: opts.Rethink.Database,
-		MaxIdle:  opts.Rethink.MaxIdle,
-		MaxOpen:  opts.Rethink.MaxOpen,
+		Addresses: opts.Rethink.Hosts,
+		Database:  opts.Rethink.Database,
+		MaxIdle:   opts.Rethink.MaxIdle,
+		MaxOpen:   opts.Rethink.MaxOpen,
 	})
 	if err != nil {
 		return
@@ -197,25 +199,45 @@ func dbBootstrap() error {
 
 func dbClean(prefix string) (err error) {
 	// Delete all tasks from this prefix
-	_, err = r.Table("tasks").
+	wres, err := r.Table("tasks").
 		Between(prefix, prefix+"\uffff").
 		Filter(r.Row.Field("detach").Not()).
-		Delete().
+		Delete(r.DeleteOpts{ReturnChanges: true}).
 		RunWrite(db, r.RunOpts{Durability: "soft"})
 	if err != nil {
 		return
 	}
+	for _, change := range wres.Changes {
+		task := ei.N(change.OldValue)
+		if path := task.M("path").StringZ(); !strings.HasPrefix(path, "@pull.") {
+			hook("task", path+task.M("method").StringZ(), task.M("user").StringZ(), ei.M{
+				"action":    "pusherDisconnect",
+				"id":        task.M("id").StringZ(),
+				"timestamp": time.Now().UTC(),
+			})
+		}
+	}
+
 	// Recover all tasks whose target session is this prefix
-	_, err = r.Table("tasks").
+	wres, err = r.Table("tasks").
 		Between(prefix, prefix+"\uffff", r.BetweenOpts{Index: "tses"}).
 		Update(r.Branch(r.Row.Field("stat").Eq("working"),
 			map[string]interface{}{"stat": "waiting", "tses": nil, "ttl": r.Row.Field("ttl").Add(-1)},
 			map[string]interface{}{}),
-			r.UpdateOpts{ReturnChanges: false}).
+			r.UpdateOpts{ReturnChanges: true}).
 		RunWrite(db, r.RunOpts{Durability: "soft"})
 	if err != nil {
 		return
 	}
+	for _, change := range wres.Changes {
+		task := ei.N(change.OldValue)
+		hook("task", task.M("path").StringZ()+task.M("method").StringZ(), task.M("user").StringZ(), ei.M{
+			"action":    "pullerDisconnect",
+			"id":        task.M("id").StringZ(),
+			"timestamp": time.Now().UTC(),
+		})
+	}
+
 	// Delete all pipes from this prefix
 	_, err = r.Table("pipes").
 		Between(prefix, prefix+"\uffff").

@@ -32,6 +32,7 @@ func nodeTrack() {
 		"id":       nodeId,
 		"deadline": r.Now().Add(10),
 		"kill":     false,
+		"version":  Version.String(),
 	}
 	_, err := r.Table("nodes").Insert(ndata).RunWrite(db)
 	if err != nil {
@@ -150,13 +151,13 @@ func (nc *NexusConn) handleNodesReq(req *JsonRpcReq) {
 			return
 		}
 
-		term := r.Table("nodes").Pluck("id", "clients", "load")
+		term := r.Table("nodes").Pluck("id", "clients", "load", "version")
 
 		if skip >= 0 {
 			term = term.Skip(skip)
 		}
 
-		if limit >= 0 {
+		if limit > 0 {
 			term = term.Limit(limit)
 		}
 

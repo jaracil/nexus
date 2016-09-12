@@ -60,7 +60,18 @@ func exit(cause string) {
 
 func main() {
 	parseOptions()
+
+	if opts.Verbose {
+		SetLogLevel(DebugLevel)
+	} else {
+		SetLogLevel(InfoLevel)
+	}
+
 	nodeId = safeId(4)
+	if opts.IsProduction {
+		Log.Formatter = ProductionFormatter{NodeID: nodeId}
+	}
+
 	signal.Notify(sigChan)
 	go signalManager()
 
@@ -76,6 +87,7 @@ func main() {
 	go pipeTrack()
 	go sessionTrack()
 	go taskPurge()
+	go hooksTrack()
 
 	listen()
 

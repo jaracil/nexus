@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	nxcli "github.com/jaracil/nxcli"
-	nexus "github.com/jaracil/nxcli/nxcore"
+	nxcli "github.com/nayarsystems/nxgo"
+	nexus "github.com/nayarsystems/nxgo/nxcore"
 )
 
 var NexusServer = "localhost:1717"
