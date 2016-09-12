@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	nexus "github.com/jaracil/nxcli/nxcore"
+	nexus "github.com/nayarsystems/nxgo/nxcore"
 )
 
 func TestUserCreateFail(t *testing.T) {

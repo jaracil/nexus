@@ -3,7 +3,8 @@ package test
 import (
 	"testing"
 	"time"
-	"github.com/jaracil/nxcli/nxcore"
+
+	"github.com/nayarsystems/nxgo/nxcore"
 )
 
 func TestSyncUnlockNotLocked(t *testing.T) {

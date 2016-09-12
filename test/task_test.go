@@ -1,10 +1,11 @@
 package test
 
 import (
-	nexus "github.com/jaracil/nxcli/nxcore"
 	"sync"
 	"testing"
 	"time"
+
+	nexus "github.com/nayarsystems/nxgo/nxcore"
 )
 
 func TestTaskTimeout(t *testing.T) {

@@ -1,10 +1,11 @@
 package test
 
 import (
-	"github.com/jaracil/ei"
-	nexus "github.com/jaracil/nxcli/nxcore"
 	"testing"
 	"time"
+
+	"github.com/jaracil/ei"
+	nexus "github.com/nayarsystems/nxgo/nxcore"
 )
 
 func TestTopicBadPipe(t *testing.T) {
