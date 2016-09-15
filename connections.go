@@ -333,7 +333,10 @@ func (nc *NexusConn) recvWorker() {
 			break
 		}
 	}
-	nc.log.Debugf("Exit from [%s] recvWorker", nc.connId)
+	nc.log.WithFields(logrus.Fields{
+		"connid": nc.connId,
+	}).Debugf("Exit from recvWorker")
+
 }
 
 func (nc *NexusConn) watchdog() {
