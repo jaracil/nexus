@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
@@ -33,7 +34,9 @@ func pipeTrack() {
 				"old_val": []string{"id"}}).
 			Run(db)
 		if err != nil {
-			Log.Printf("Error opening pipeTrack iterator: %s", err.Error())
+			Log.WithFields(logrus.Fields{
+				"error": err.Error(),
+			}).Printf("Error opening pipeTrack iterator")
 			time.Sleep(time.Second)
 			continue
 		}
@@ -41,7 +44,9 @@ func pipeTrack() {
 		for {
 			pf := &PipeFeed{}
 			if !iter.Next(pf) {
-				Log.Printf("Error processing pipeTrack feed: %s", iter.Err().Error())
+				Log.WithFields(logrus.Fields{
+					"error": iter.Err().Error(),
+				}).Printf("Error processing pipeTrack feed")
 				iter.Close()
 				break
 			}

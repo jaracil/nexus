@@ -4,6 +4,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
@@ -36,7 +37,9 @@ func nodeTrack() {
 	}
 	_, err := r.Table("nodes").Insert(ndata).RunWrite(db)
 	if err != nil {
-		Log.Errorf("Error, can't insert on nodes table [%s]", err.Error())
+		Log.WithFields(logrus.Fields{
+			"error": err.Error(),
+		}).Errorf("Error, can't insert on nodes table")
 		return
 	}
 	// WatchDog loop
@@ -58,7 +61,9 @@ func nodeTrack() {
 				Update(info, r.UpdateOpts{ReturnChanges: true}).
 				RunWrite(db)
 			if err != nil {
-				Log.Errorf("Error, can't update on nodes table [%s]", err.Error())
+				Log.WithFields(logrus.Fields{
+					"error": err.Error(),
+				}).Errorf("Error, can't update on nodes table")
 				exit = true
 				break
 			}
@@ -91,7 +96,9 @@ func nodeTrack() {
 					for _, n := range nodesKilled {
 						id := ei.N(n).M("id").StringZ()
 						cleanNode(id)
-						Log.Printf("Cleaning node [%s]", id)
+						Log.WithFields(logrus.Fields{
+							"node": id,
+						}).Printf("Cleaning node")
 					}
 				}
 			}
@@ -130,7 +137,10 @@ func cleanNode(node string) {
 	if err == nil {
 		r.Table("nodes").Get(node).Delete().RunWrite(db)
 	} else {
-		Log.Errorf("Error cleaning node [%s]: %s", node, err)
+		Log.WithFields(logrus.Fields{
+			"node":  node,
+			"error": err.Error(),
+		}).Error("Error cleaning node")
 	}
 }
 

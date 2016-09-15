@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
 	"github.com/tylerb/graceful"
@@ -21,7 +22,9 @@ type httpwsHandler struct{}
 func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	if req.TLS == nil {
-		Log.Warnf("Unencrypted connection from %s!", req.RemoteAddr)
+		Log.WithFields(logrus.Fields{
+			"remote": req.RemoteAddr,
+		}).Warn("Unencrypted connection!!")
 	}
 
 	if headerContains(req.Header["Connection"], "Upgrade") {
@@ -36,7 +39,9 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 				} else {
 					ws.Config().Origin = u
 				}
-				Log.Println("WebSocket connection from:", ws.RemoteAddr())
+				Log.WithFields(logrus.Fields{
+					"remote": ws.RemoteAddr().String(),
+				}).Println("New WebSocket connection")
 
 				nc := NewNexusConn(ws)
 				if req.TLS != nil {
@@ -54,7 +59,9 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 			wsrv.ServeHTTP(res, req)
 
 		} else {
-			Log.Warnf("Connection dropped for requesting an upgrade to an unsupported protocol: %v", req.Header["Upgrade"])
+			Log.WithFields(logrus.Fields{
+				"unsupported": req.Header["Upgrade"],
+			}).Warn("Connection dropped for requesting an upgrade to an unsupported protocol")
 			res.WriteHeader(http.StatusBadRequest)
 		}
 
@@ -110,7 +117,9 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 }
 
 func httpListener(u *url.URL, ctx context.Context) {
-	defer Log.Println("Listener", u, "finished")
+	defer Log.WithFields(logrus.Fields{
+		"listener": u,
+	}).Println("HTTP listener finished")
 	server := graceful.Server{
 		Server:  &http.Server{Addr: u.Host, Handler: http.Handler(&httpwsHandler{})},
 		Timeout: 0,
@@ -123,17 +132,24 @@ func httpListener(u *url.URL, ctx context.Context) {
 		}
 	}()
 
-	Log.Println("Listening on", u)
+	Log.WithFields(logrus.Fields{
+		"address": u.String(),
+	}).Println("New HTTP listener started")
+
 	err := server.ListenAndServe()
 	if err != nil && ctx.Err() == nil {
-		Log.Errorln("HTTP listener error:", err.Error())
+		Log.WithFields(logrus.Fields{
+			"error": err.Error(),
+		}).Errorln("HTTP listener error")
 		exit("http listener goroutine error")
 		return
 	}
 }
 
 func httpsListener(u *url.URL, ctx context.Context) {
-	defer Log.Println("Listener", u, "finished")
+	defer Log.WithFields(logrus.Fields{
+		"listener": u,
+	}).Println("HTTPS listener finished")
 
 	server := graceful.Server{
 		Server:  &http.Server{Addr: u.Host, Handler: http.Handler(&httpwsHandler{})},
@@ -147,17 +163,25 @@ func httpsListener(u *url.URL, ctx context.Context) {
 		}
 	}()
 
-	Log.Println("Listening on", u)
+	Log.WithFields(logrus.Fields{
+		"address": u.String(),
+	}).Println("New HTTPS listener started")
+
 	err := server.ListenAndServeTLS(opts.SSL.Cert, opts.SSL.Key)
 	if err != nil && ctx.Err() == nil {
-		Log.Errorln("HTTPS listener error:", err.Error())
+		Log.WithFields(logrus.Fields{
+			"error": err.Error(),
+		}).Error("HTTPS listener error")
 		exit("https listener goroutine error")
 		return
 	}
 }
 
 func healthCheckListener(u *url.URL, ctx context.Context) {
-	defer Log.Println("Listener", u, "finished")
+	defer Log.WithFields(logrus.Fields{
+		"listener": u,
+	}).Println("Health listener finished")
+
 	server := graceful.Server{
 		Server: &http.Server{Addr: u.Host, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(200)
@@ -172,10 +196,15 @@ func healthCheckListener(u *url.URL, ctx context.Context) {
 		}
 	}()
 
-	Log.Println("Listening on", u)
+	Log.WithFields(logrus.Fields{
+		"address": u.String(),
+	}).Println("New health listener started")
+
 	err := server.ListenAndServe()
 	if err != nil && ctx.Err() == nil {
-		Log.Errorln("HealthCheck listener error:", err.Error())
+		Log.WithFields(logrus.Fields{
+			"error": err.Error(),
+		}).Errorln("HealthCheck listener error")
 		exit("healthCheck listener goroutine error")
 		return
 	}

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
@@ -176,13 +177,17 @@ HookLoop:
 	for retry := 0; retry < 10; retry++ {
 		pipe, err := nic.PipeCreate()
 		if err != nil {
-			Log.Errorln("Error creating pipe on hooks topic-listen:", err.Error())
+			Log.WithFields(logrus.Fields{
+				"error": err.Error(),
+			}).Errorln("Error creating pipe on hooks topic-listen")
 			time.Sleep(time.Second)
 			continue
 		}
 		_, err = nic.TopicSubscribe(pipe, "hook.listen")
 		if err != nil {
-			Log.Errorln("Error subscribing to topic on hooks topic-listen:", err.Error())
+			Log.WithFields(logrus.Fields{
+				"error": err.Error(),
+			}).Errorln("Error subscribing to topic on hooks topic-listen")
 			time.Sleep(time.Second)
 			continue
 		}
@@ -190,12 +195,16 @@ HookLoop:
 		for {
 			topicData, err := pipe.TopicRead(10, time.Minute)
 			if err != nil {
-				Log.Errorln("Error reading from pipe on hooks topic-listen")
+				Log.WithFields(logrus.Fields{
+					"error": err.Error(),
+				}).Errorln("Error reading from pipe on hooks topic-listen")
 				time.Sleep(time.Second)
 				continue HookLoop
 			}
 			if topicData.Drops != 0 {
-				Log.Warnf("Got %d drops reading from pipe on hooks topic-listen", topicData.Drops)
+				Log.WithFields(logrus.Fields{
+					"drops": topicData.Drops,
+				}).Warnf("Got drops reading from pipe on hooks topic-listen", topicData.Drops)
 			}
 			for _, msg := range topicData.Msgs {
 				m := ei.N(msg.Msg)
