@@ -260,13 +260,13 @@ Calls a method which will be resolved by the system, and will return a result or
 ### Parameters:
   * `"method": <String>` - Which method is this task invoking
   * `"params": <Object>` - Method parameters
-  * `"detached": <Bool>` - The task will eventually be processed but we do not care about the result
+  * `"detach": <Bool>` - The task will eventually be processed but we do not care about the result
   * `"prio": <Number>` - Sets the priority of this task among other pushes on the same method
   * `"ttl": <Number>` - How many times this task can be requeued (by a failed worker/node or a task reject)
   * `"timeout": <Number>` - How much time should a task be on any state other than "done" before the task is considered failed.
 
 ### Result:
-If "detached" is true, it will immediately receive:
+If "detach" is true, it will immediately receive:
 
     "result": { "ok": true }
 
@@ -286,7 +286,7 @@ Pulls a task from a path to work on
   * `"timeout": <Number>` - How much time should we wait for a task to get pulled
 
 ### Result:
-     "result": {detach":false,"method":"test","params":{},"path":"asdf.","prio":0,"tags":{"@admin":true},"taskid":"687c3b7b966f55e92d376e4b6a6da37f9c8d","user":"root"}
+     "result": {"detach":false,"method":"test","params":{},"path":"asdf.","prio":0,"tags":{"@admin":true},"taskid":"687c3b7b966f55e92d376e4b6a6da37f9c8d","user":"root"}
 
 ## task.result
 Mark a task as finished successfully, and set the task result parameter
