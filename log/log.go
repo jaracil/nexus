@@ -25,7 +25,7 @@ const (
 
 func init() {
 	Logger = logrus.New()
-	customFormatter := new(logrus.TextFormatter)
+	customFormatter := &logrus.TextFormatter{DisableSorting: false}
 	customFormatter.FullTimestamp = true
 	customFormatter.TimestampFormat = TimestampFormat
 	Logger.Formatter = customFormatter
@@ -83,6 +83,7 @@ func LogLevelIs(l uint8) bool {
 func LogWithNode(node string) *logrus.Entry {
 	return Logger.WithFields(logrus.Fields{
 		"node": node,
+		"type": "system",
 	})
 }
 
