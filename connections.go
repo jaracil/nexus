@@ -119,11 +119,32 @@ func (req *JsonRpcReq) Result(result interface{}) {
 			Result: result,
 		},
 	)
+
 }
 
 func (nc *NexusConn) pushRes(res *JsonRpcRes) (err error) {
 	select {
 	case nc.chRes <- res:
+		wf := nc.log.WithFields(logrus.Fields{
+			"connid": nc.connId,
+			"id":     res.Id,
+			"type":   "response",
+			"remote": nc.conn.RemoteAddr().String(),
+			"proto":  nc.proto,
+		})
+
+		if res.Error != nil {
+			wf.WithFields(logrus.Fields{
+				"code":    res.Error.Code,
+				"message": res.Error.Message,
+				"data":    res.Error.Data,
+			}).Info("<< error")
+		} else {
+			wf.WithFields(logrus.Fields{
+				"result": res.Result,
+			}).Info("<< result")
+		}
+
 	case <-nc.context.Done():
 		err = errors.New("Context cancelled")
 	}
@@ -142,6 +163,27 @@ func (nc *NexusConn) pullRes() (res *JsonRpcRes, err error) {
 func (nc *NexusConn) pushReq(req *JsonRpcReq) (err error) {
 	select {
 	case nc.chReq <- req:
+		if req.Method != "sys.ping" || LogLevelIs(DebugLevel) {
+			e := nc.log.WithFields(logrus.Fields{
+				"connid": req.nc.connId,
+				"id":     req.Id,
+				"method": req.Method,
+				"remote": req.nc.conn.RemoteAddr().String(),
+				"proto":  nc.proto,
+				"params": req.Params,
+				"type":   "request",
+			})
+
+			// Fine tuning of logged fields
+			if opts.IsProduction {
+				switch req.Method {
+				case "sys.login":
+					e = e.WithField("params", "hidden")
+				}
+			}
+
+			e.Infof(">> %s", req.Method)
+		}
 	case <-nc.context.Done():
 		err = errors.New("Context cancelled")
 	}
@@ -469,16 +511,6 @@ func (nc *NexusConn) handle() {
 		if (req.Jsonrpc != "2.0" && req.Jsonrpc != "") || req.Method == "" { //"jsonrpc":"2.0" is optional
 			req.Error(ErrInvalidRequest, "", nil)
 			continue
-		}
-
-		if ((req.Method != "sys.ping" && nc.proto != "internal") || LogLevelIs(DebugLevel)) && req.Method != "sys.login" {
-			nc.log.WithFields(logrus.Fields{
-				"connid": req.nc.connId,
-				"id":     req.Id,
-				"method": req.Method,
-				"params": req.Params,
-				"remote": req.nc.conn.RemoteAddr().String(),
-			}).Info(req.Method)
 		}
 
 		go nc.handleReq(req)
