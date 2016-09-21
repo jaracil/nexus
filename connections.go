@@ -30,7 +30,8 @@ type JsonRpcReq struct {
 	Id      interface{} `json:"id,omitempty"`
 	Method  string      `json:"method"`
 	Params  interface{} `json:"params"`
-	nc      *NexusConn
+
+	nc *NexusConn
 }
 
 type JsonRpcRes struct {
@@ -38,6 +39,8 @@ type JsonRpcRes struct {
 	Id      interface{} `json:"id,omitempty"`
 	Result  interface{} `json:"result,omitempty"`
 	Error   *JsonRpcErr `json:"error,omitempty"`
+
+	req *JsonRpcReq
 }
 
 type NexusConn struct {
@@ -125,24 +128,26 @@ func (req *JsonRpcReq) Result(result interface{}) {
 func (nc *NexusConn) pushRes(res *JsonRpcRes) (err error) {
 	select {
 	case nc.chRes <- res:
-		wf := nc.log.WithFields(logrus.Fields{
-			"connid": nc.connId,
-			"id":     res.Id,
-			"type":   "response",
-			"remote": nc.conn.RemoteAddr().String(),
-			"proto":  nc.proto,
-		})
+		if res.req.Method != "sys.ping" || LogLevelIs(DebugLevel) {
+			wf := nc.log.WithFields(logrus.Fields{
+				"connid": nc.connId,
+				"id":     res.Id,
+				"type":   "response",
+				"remote": nc.conn.RemoteAddr().String(),
+				"proto":  nc.proto,
+			})
 
-		if res.Error != nil {
-			wf.WithFields(logrus.Fields{
-				"code":    res.Error.Code,
-				"message": res.Error.Message,
-				"data":    res.Error.Data,
-			}).Info("<< error")
-		} else {
-			wf.WithFields(logrus.Fields{
-				"result": res.Result,
-			}).Info("<< result")
+			if res.Error != nil {
+				wf.WithFields(logrus.Fields{
+					"code":    res.Error.Code,
+					"message": res.Error.Message,
+					"data":    res.Error.Data,
+				}).Info("<< error")
+			} else {
+				wf.WithFields(logrus.Fields{
+					"result": res.Result,
+				}).Info("<< result")
+			}
 		}
 
 	case <-nc.context.Done():

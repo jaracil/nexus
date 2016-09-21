@@ -283,6 +283,12 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			CreationTime: r.Now(),
 			DeadLine:     r.Now().Add(timeout),
 		}
+		nc.log.WithFields(logrus.Fields{
+			"connid": req.nc.connId,
+			"id":     req.Id,
+			"taskid": task.Id,
+		}).Info("taskid generated")
+
 		_, err = r.Table("tasks").Insert(task, r.InsertOpts{}).RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
