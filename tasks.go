@@ -178,12 +178,35 @@ func taskPull(task *Task) bool {
 		}
 		break
 	}
+
 	r.Table("tasks").
 		Get(task.Id).
 		Update(r.Branch(r.Row.Field("stat").Eq("working"),
 		ei.M{"stat": "waiting"},
 		ei.M{})).
 		RunWrite(db, r.RunOpts{Durability: "soft"})
+
+	// On the previous step where the pull transitions from working to waiting
+	// there is a race condition where a push could enter and a single pull on that
+	// path wouldnt be able to notice, and a deadlock would happen.
+	// Here we check again for any task waiting that we could accept, and set ourselves
+	// as working again to restart the loop on taskTrack()
+
+	stuck, _ := r.Table("tasks").
+		OrderBy(r.OrderByOpts{Index: "pspc"}).
+		Between(ei.S{prefix, "waiting", r.MinVal, r.MinVal}, ei.S{prefix, "waiting", r.MaxVal, r.MaxVal}, r.BetweenOpts{RightBound: "closed", Index: "pspc"}).
+		Limit(1).
+		Run(db, r.RunOpts{Durability: "soft"})
+
+	if !stuck.IsNil() {
+		r.Table("tasks").
+			Get(task.Id).
+			Update(r.Branch(r.Row.Field("stat").Eq("waiting"),
+				ei.M{"stat": "working"},
+				ei.M{})).
+			RunWrite(db, r.RunOpts{Durability: "soft"})
+	}
+
 	return false
 }
 
