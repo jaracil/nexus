@@ -3,6 +3,7 @@ package main
 import (
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
@@ -26,11 +27,13 @@ func sessionTrack() {
 			Between(nodeId, nodeId+"\uffff").
 			Changes(r.ChangesOpts{IncludeInitial: true, Squash: false}).
 			Pluck(map[string]interface{}{
-			"new_val": []string{"id", "kick", "reload"},
-			"old_val": []string{"id"}}).
+				"new_val": []string{"id", "kick", "reload"},
+				"old_val": []string{"id"}}).
 			Run(db)
 		if err != nil {
-			Log.Errorf("Error opening sessionTrack iterator:%s", err.Error())
+			Log.WithFields(logrus.Fields{
+				"error": err.Error(),
+			}).Errorf("Error opening sessionTrack iterator")
 			time.Sleep(time.Second)
 			continue
 		}
@@ -38,7 +41,9 @@ func sessionTrack() {
 		for {
 			sf := &SessionFeed{}
 			if !iter.Next(sf) {
-				Log.Errorf("Error processing sessionTrack feed: %s", iter.Err().Error())
+				Log.WithFields(logrus.Fields{
+					"error": iter.Err().Error(),
+				}).Errorf("Error processing sessionTrack feed")
 				iter.Close()
 				break
 			}
@@ -71,13 +76,13 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 		term := r.Table("sessions").
 			Between(prefix, prefix+"\uffff", r.BetweenOpts{Index: "users"}).
 			Map(func(row r.Term) interface{} {
-			return ei.M{"user": row.Field("user"),
-				"connid":        row.Field("id"),
-				"nodeid":        row.Field("nodeId"),
-				"remoteAddress": row.Field("remoteAddress"),
-				"creationTime":  row.Field("creationTime"),
-				"protocol":      row.Field("protocol")}
-		}).
+				return ei.M{"user": row.Field("user"),
+					"connid":        row.Field("id"),
+					"nodeid":        row.Field("nodeId"),
+					"remoteAddress": row.Field("remoteAddress"),
+					"creationTime":  row.Field("creationTime"),
+					"protocol":      row.Field("protocol")}
+			}).
 			Group("user").
 			Pluck("connid", "nodeid", "remoteAddress", "creationTime", "protocol").
 			Filter(r.Row.Field("protocol").Ne("internal"))
@@ -92,10 +97,10 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 
 		cur, err := term.Ungroup().
 			Map(func(row r.Term) interface{} {
-			return ei.M{"user": row.Field("group"),
-				"sessions": row.Field("reduction"),
-				"n":        row.Field("reduction").Count()}
-		}).Run(db)
+				return ei.M{"user": row.Field("group"),
+					"sessions": row.Field("reduction"),
+					"n":        row.Field("reduction").Count()}
+			}).Run(db)
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
@@ -147,7 +152,12 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 			return
 		}
 
-		Log.Printf("Session [%s] is %sing session [%s] from user [%s]", nc.connId, action, prefix, user)
+		Log.WithFields(logrus.Fields{
+			"connid":  nc.connId,
+			"action":  action,
+			"session": prefix,
+			"by":      user,
+		}).Printf("Session %s", action)
 
 		res, err := r.Table("sessions").
 			Between(prefix, prefix+"\uffff").

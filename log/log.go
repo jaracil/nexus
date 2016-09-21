@@ -1,11 +1,18 @@
 // Package log
 package log
 
-import "github.com/Sirupsen/logrus"
+import (
+	"io/ioutil"
+
+	"github.com/Sirupsen/logrus"
+)
 
 // Singleton logrus logger object with custom format.
 // Verbosity can be changed through SetLogLevel.
-var Log *logrus.Logger
+var Log *logrus.Entry
+var Logger *logrus.Logger
+
+var TimestampFormat = "2006/01/02 15:04:05.000000 -0700"
 
 const (
 	PanicLevel uint8 = iota
@@ -17,37 +24,40 @@ const (
 )
 
 func init() {
-	Log = logrus.New()
-	customFormatter := new(logrus.TextFormatter)
+	Logger = logrus.New()
+	customFormatter := &logrus.TextFormatter{DisableSorting: false}
 	customFormatter.FullTimestamp = true
-	customFormatter.TimestampFormat = "2006/01/02 15:04:05"
-	Log.Formatter = customFormatter
-	Log.Level = logrus.DebugLevel
+	customFormatter.TimestampFormat = TimestampFormat
+	Logger.Formatter = customFormatter
+	Logger.Level = logrus.DebugLevel
+	Log = Logger.WithFields(logrus.Fields{
+		"node": "not initialized",
+	})
 }
 
 // Sets log level to one of (debug, info, warn, error, fatal, panic)
 func SetLogLevel(l uint8) {
 	switch l {
 	case DebugLevel:
-		Log.Level = logrus.DebugLevel
+		Logger.Level = logrus.DebugLevel
 	case InfoLevel:
-		Log.Level = logrus.InfoLevel
+		Logger.Level = logrus.InfoLevel
 	case WarnLevel:
-		Log.Level = logrus.WarnLevel
+		Logger.Level = logrus.WarnLevel
 	case ErrorLevel:
-		Log.Level = logrus.ErrorLevel
+		Logger.Level = logrus.ErrorLevel
 	case FatalLevel:
-		Log.Level = logrus.FatalLevel
+		Logger.Level = logrus.FatalLevel
 	case PanicLevel:
-		Log.Level = logrus.PanicLevel
+		Logger.Level = logrus.PanicLevel
 
 	default:
-		Log.Level = logrus.DebugLevel
+		Logger.Level = logrus.DebugLevel
 	}
 }
 
 func GetLogLevel() uint8 {
-	switch Log.Level {
+	switch Logger.Level {
 	case logrus.DebugLevel:
 		return DebugLevel
 	case logrus.InfoLevel:
@@ -68,4 +78,19 @@ func GetLogLevel() uint8 {
 
 func LogLevelIs(l uint8) bool {
 	return GetLogLevel() == l
+}
+
+func LogWithNode(node string) *logrus.Entry {
+	return Logger.WithFields(logrus.Fields{
+		"node": node,
+		"type": "system",
+	})
+}
+
+func LogDiscard() *logrus.Entry {
+	Logger := logrus.New()
+	Logger.Out = ioutil.Discard
+	return Logger.WithFields(logrus.Fields{
+		"node": "not initialized",
+	})
 }
