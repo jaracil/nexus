@@ -28,6 +28,7 @@ type Task struct {
 	ErrObj       interface{} `gorethink:"errObj,omitempty" json:"errObject"`
 	Tags         interface{} `gorethink:"tags,omitempty" json:"tags"`
 	CreationTime interface{} `gorethink:"creationTime,omitempty" json:"creationTime"`
+	WorkingTime  interface{} `gorethink:"workingTime,omitempty" json:"workingTime"`
 	DeadLine     interface{} `gorethink:"deadLine,omitempty" json:"deadline"`
 }
 
@@ -83,7 +84,23 @@ func taskTrack() {
 			Between(nodeId, nodeId+"\uffff").
 			Changes(r.ChangesOpts{IncludeInitial: true, Squash: false}).
 			Filter(r.Row.Field("new_val").Ne(nil)).
-			Pluck(ei.M{"new_val": []string{"id", "stat", "localId", "detach", "user", "prio", "ttl", "path", "method", "result", "errCode", "errStr", "errObj"}}).
+			Pluck(ei.M{"new_val": []string{
+				"id",
+				"stat",
+				"localId",
+				"detach",
+				"user",
+				"prio",
+				"ttl",
+				"path",
+				"method",
+				"result",
+				"errCode",
+				"errStr",
+				"errObj",
+				"tses",
+				"creationTime",
+				"workingTime"}}).
 			Run(db)
 		if err != nil {
 			Log.WithFields(logrus.Fields{
@@ -137,7 +154,7 @@ func taskPull(task *Task) bool {
 			Between(ei.S{prefix, "waiting", r.MinVal, r.MinVal}, ei.S{prefix, "waiting", r.MaxVal, r.MaxVal}, r.BetweenOpts{RightBound: "closed", Index: "pspc"}).
 			Limit(1).
 			Update(r.Branch(r.Row.Field("stat").Eq("waiting"),
-				ei.M{"stat": "working", "tses": task.Id[0:16]},
+				ei.M{"stat": "working", "tses": task.Id[0:16], "workingTime": r.Now()},
 				ei.M{}),
 				r.UpdateOpts{ReturnChanges: true}).
 			RunWrite(db, r.RunOpts{Durability: "soft"})
@@ -318,23 +335,24 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			return
 		}
 		hook("task", task.Path+task.Method, task.User, ei.M{
-			"action":    "push",
-			"id":        task.Id,
-			"connid":    nc.connId,
-			"user":      nc.user.User,
-			"tags":      nc.user.Tags,
-			"path":      path,
-			"method":    met,
-			"params":    params,
-			"detach":    detach,
-			"ttl":       ttl,
-			"prio":      prio,
-			"timestamp": time.Now().UTC(),
-			"timeout":   timeout,
+			"action":       "push",
+			"id":           task.Id,
+			"connid":       nc.connId,
+			"user":         nc.user.User,
+			"tags":         nc.user.Tags,
+			"path":         path,
+			"method":       met,
+			"params":       params,
+			"detach":       detach,
+			"ttl":          ttl,
+			"prio":         prio,
+			"creationTime": time.Now().UTC(),
+			"timeout":      timeout,
 		})
 		if detach {
 			req.Result(ei.M{"ok": true})
 		}
+
 	case "task.pull":
 		if req.Id == nil {
 			return
