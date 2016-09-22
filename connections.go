@@ -111,6 +111,7 @@ func (req *JsonRpcReq) Error(code int, message string, data interface{}) {
 		&JsonRpcRes{
 			Id:    req.Id,
 			Error: &JsonRpcErr{Code: code, Message: message, Data: data},
+			req:   req,
 		},
 	)
 }
@@ -120,6 +121,7 @@ func (req *JsonRpcReq) Result(result interface{}) {
 		&JsonRpcRes{
 			Id:     req.Id,
 			Result: result,
+			req:    req,
 		},
 	)
 
@@ -128,7 +130,7 @@ func (req *JsonRpcReq) Result(result interface{}) {
 func (nc *NexusConn) pushRes(res *JsonRpcRes) (err error) {
 	select {
 	case nc.chRes <- res:
-		if res.req.Method != "sys.ping" || LogLevelIs(DebugLevel) {
+		if res.req == nil || res.req.Method != "sys.ping" || LogLevelIs(DebugLevel) {
 			wf := nc.log.WithFields(logrus.Fields{
 				"connid": nc.connId,
 				"id":     res.Id,

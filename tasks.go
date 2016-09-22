@@ -262,7 +262,6 @@ func taskExpireTtl(taskid string) {
 }
 
 func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
-	var null *int
 	switch req.Method {
 	case "task.push":
 		method, err := ei.N(req.Params).M("method").Lower().String()
@@ -361,7 +360,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			Stat:         "working",
 			Path:         "@pull." + prefix,
 			Method:       "",
-			Params:       null,
+			Params:       nil,
 			LocalId:      req.Id,
 			CreationTime: r.Now(),
 			DeadLine:     r.Now().Add(timeout),
@@ -369,7 +368,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		}
 		_, err := r.Table("tasks").Insert(task).RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
-			req.Error(-32603, "", nil)
+			req.Error(ErrInternal, "", nil)
 			return
 		}
 
