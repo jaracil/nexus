@@ -177,7 +177,7 @@ func (nc *NexusConn) pushReq(req *JsonRpcReq) (err error) {
 				"method": req.Method,
 				"remote": req.nc.conn.RemoteAddr().String(),
 				"proto":  nc.proto,
-				"params": req.Params,
+				"params": truncateJson(req.Params),
 				"type":   "request",
 			})
 
