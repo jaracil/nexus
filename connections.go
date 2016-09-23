@@ -378,7 +378,10 @@ func (nc *NexusConn) recvWorker() {
 		}
 		err = nc.pushReq(req)
 		if err != nil {
-			nc.log.Debugf("Error on [%s] recvWorker: %s", nc.connId, err)
+			nc.log.WithFields(logrus.Fields{
+				"connid": nc.connId,
+				"error":  err,
+			}).Debugf("Error on recvWorker")
 			break
 		}
 	}
@@ -400,7 +403,9 @@ func (nc *NexusConn) watchdog() {
 			if (now-nc.connRx.GetLast() > max) &&
 				(now-nc.connTx.GetLast() > max) {
 				exit = true
-				nc.log.Warnf("Connection [%s] watch dog expired!", nc.connId)
+				nc.log.WithFields(logrus.Fields{
+					"connid": nc.connId,
+				}).Warnln("Connection watchdog expired!")
 			}
 
 			nc.updateSession()
@@ -453,9 +458,14 @@ func (nc *NexusConn) reload(fromSameSession bool) (bool, int) {
 		if err != nil || wres.Replaced == 0 {
 			return false, ErrInternal
 		}
-		nc.log.Printf("Connection [%s] reloaded by other session", nc.connId)
+		nc.log.WithFields(logrus.Fields{
+			"connid": nc.connId,
+			"error":  err,
+		}).Printf("Connection reloaded by other session")
 	} else {
-		nc.log.Printf("Connection [%s] reloaded by itself", nc.connId)
+		nc.log.WithFields(logrus.Fields{
+			"connid": nc.connId,
+		}).Printf("Connection reloaded by itself")
 	}
 	return true, 0
 }
@@ -475,7 +485,10 @@ func (nc *NexusConn) updateSession() {
 		RunWrite(db)
 
 	if err != nil {
-		nc.log.Errorf("Error updating session [%s]: %s", nc.connId, err)
+		nc.log.WithFields(logrus.Fields{
+			"connid": nc.connId,
+			"error":  err,
+		}).Errorln("Error updating session")
 		nc.close()
 	}
 }
