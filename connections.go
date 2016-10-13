@@ -274,6 +274,23 @@ func (nc *NexusConn) respWorker() {
 			switch res := d.(type) {
 
 			case *Task:
+
+				cT, _ := res.CreationTime.(time.Time)
+				wT, _ := res.WorkingTime.(time.Time)
+				nc.log.WithFields(logrus.Fields{
+					"type":          "metric",
+					"kind":          "taskCompleted",
+					"connid":        nc.connId,
+					"id":            res.LocalId,
+					"taskid":        res.Id,
+					"path":          res.Path,
+					"method":        res.Method,
+					"ttl":           res.Ttl,
+					"targetSession": res.Tses,
+					"waitingTime":   wT.Sub(cT).Seconds(),
+					"workingTime":   time.Since(wT).Seconds(),
+				}).Info("task completed")
+
 				if res.ErrCode != nil {
 					nc.pushRes(
 						&JsonRpcRes{
