@@ -303,8 +303,8 @@ Mark a task as finished with an error, and set the error fields
 
 ### Parameters:
 * `"taskid": <String>` - Task being resolved with an error
-* `"code": <Object>` - *Optional* - Error code
-* `"message": <Object>` - *Optional* - Error message
+* `"code": <Number>` - *Optional* - Error code
+* `"message": <String>` - *Optional* - Error message
 * `"data": <Object>` - *Optional* - Error data
 
 ### Result:

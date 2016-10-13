@@ -10,6 +10,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/Sirupsen/logrus"
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
@@ -29,7 +30,8 @@ type JsonRpcReq struct {
 	Id      interface{} `json:"id,omitempty"`
 	Method  string      `json:"method"`
 	Params  interface{} `json:"params"`
-	nc      *NexusConn
+
+	nc *NexusConn
 }
 
 type JsonRpcRes struct {
@@ -37,6 +39,8 @@ type JsonRpcRes struct {
 	Id      interface{} `json:"id,omitempty"`
 	Result  interface{} `json:"result,omitempty"`
 	Error   *JsonRpcErr `json:"error,omitempty"`
+
+	req *JsonRpcReq
 }
 
 type NexusConn struct {
@@ -52,6 +56,7 @@ type NexusConn struct {
 	cancelFun context.CancelFunc
 	wdog      int64
 	closed    int32 //Atomic bool
+	log       *logrus.Entry
 }
 
 func NewNexusConn(conn net.Conn) *NexusConn {
@@ -65,6 +70,7 @@ func NewNexusConn(conn net.Conn) *NexusConn {
 		chRes:  make(chan *JsonRpcRes, 64),
 		chReq:  make(chan *JsonRpcReq, 64),
 		wdog:   90,
+		log:    Log,
 	}
 	nc.context, nc.cancelFun = context.WithCancel(mainContext)
 	return nc
@@ -74,6 +80,11 @@ func NewInternalClient() *nxcore.NexusConn {
 	client, server := net.Pipe()
 
 	nc := NewNexusConn(server)
+
+	if len(opts.Verbose) < 2 {
+		nc.log = LogDiscard()
+	}
+
 	nc.proto = "internal"
 	nc.user = &UserData{
 		User: "@internal",
@@ -100,6 +111,7 @@ func (req *JsonRpcReq) Error(code int, message string, data interface{}) {
 		&JsonRpcRes{
 			Id:    req.Id,
 			Error: &JsonRpcErr{Code: code, Message: message, Data: data},
+			req:   req,
 		},
 	)
 }
@@ -109,13 +121,37 @@ func (req *JsonRpcReq) Result(result interface{}) {
 		&JsonRpcRes{
 			Id:     req.Id,
 			Result: result,
+			req:    req,
 		},
 	)
+
 }
 
 func (nc *NexusConn) pushRes(res *JsonRpcRes) (err error) {
 	select {
 	case nc.chRes <- res:
+		if res.req == nil || res.req.Method != "sys.ping" || LogLevelIs(DebugLevel) {
+			wf := nc.log.WithFields(logrus.Fields{
+				"connid": nc.connId,
+				"id":     res.Id,
+				"type":   "response",
+				"remote": nc.conn.RemoteAddr().String(),
+				"proto":  nc.proto,
+			})
+
+			if res.Error != nil {
+				wf.WithFields(logrus.Fields{
+					"code":    res.Error.Code,
+					"message": res.Error.Message,
+					"data":    res.Error.Data,
+				}).Info("<< error")
+			} else {
+				wf.WithFields(logrus.Fields{
+					"result": res.Result,
+				}).Info("<< result")
+			}
+		}
+
 	case <-nc.context.Done():
 		err = errors.New("Context cancelled")
 	}
@@ -134,6 +170,27 @@ func (nc *NexusConn) pullRes() (res *JsonRpcRes, err error) {
 func (nc *NexusConn) pushReq(req *JsonRpcReq) (err error) {
 	select {
 	case nc.chReq <- req:
+		if req.Method != "sys.ping" || LogLevelIs(DebugLevel) {
+			e := nc.log.WithFields(logrus.Fields{
+				"connid": req.nc.connId,
+				"id":     req.Id,
+				"method": req.Method,
+				"remote": req.nc.conn.RemoteAddr().String(),
+				"proto":  nc.proto,
+				"params": truncateJson(req.Params),
+				"type":   "request",
+			})
+
+			// Fine tuning of logged fields
+			if opts.IsProduction {
+				switch req.Method {
+				case "sys.login":
+					e = e.WithField("params", "hidden")
+				}
+			}
+
+			e.Infof(">> %s", req.Method)
+		}
 	case <-nc.context.Done():
 		err = errors.New("Context cancelled")
 	}
@@ -203,7 +260,10 @@ func (nc *NexusConn) respWorker() {
 	defer nc.close()
 	trackCh, err := sesNotify.Register(nc.connId, make(chan interface{}, 1024))
 	if err != nil { // Duplicated session ???
-		Log.Warnf("Error on [%s] respWorker: %s", nc.connId, err)
+		nc.log.WithFields(logrus.Fields{
+			"connid": nc.connId,
+			"error":  err,
+		}).Warnf("Error on respWorker")
 		return
 	}
 	defer sesNotify.Unregister(nc.connId)
@@ -214,6 +274,23 @@ func (nc *NexusConn) respWorker() {
 			switch res := d.(type) {
 
 			case *Task:
+
+				cT, _ := res.CreationTime.(time.Time)
+				wT, _ := res.WorkingTime.(time.Time)
+				nc.log.WithFields(logrus.Fields{
+					"type":          "metric",
+					"kind":          "taskCompleted",
+					"connid":        nc.connId,
+					"id":            res.LocalId,
+					"taskid":        res.Id,
+					"path":          res.Path,
+					"method":        res.Method,
+					"ttl":           res.Ttl,
+					"targetSession": res.Tses,
+					"waitingTime":   wT.Sub(cT).Seconds(),
+					"workingTime":   time.Since(wT).Seconds(),
+				}).Info("task completed")
+
 				if res.ErrCode != nil {
 					nc.pushRes(
 						&JsonRpcRes{
@@ -235,7 +312,9 @@ func (nc *NexusConn) respWorker() {
 					nc.reload(false)
 				}
 				if res.Kick {
-					Log.Printf("Connection [%s] has been kicked!", nc.connId)
+					nc.log.WithFields(logrus.Fields{
+						"connid": nc.connId,
+					}).Printf("Connection kicked!", nc.connId)
 					nc.close()
 				}
 			}
@@ -252,7 +331,10 @@ func (nc *NexusConn) sendWorker() {
 	for {
 		res, err := nc.pullRes()
 		if err != nil {
-			Log.Debugf("Error on [%s] sendWorker: %s", nc.connId, err)
+			nc.log.WithFields(logrus.Fields{
+				"connid": nc.connId,
+				"error":  err,
+			}).Debugf("Error on sendWorker")
 			break
 		}
 		if res.Id == nil {
@@ -271,17 +353,25 @@ func (nc *NexusConn) sendWorker() {
 		}
 		buf, err := json.Marshal(res)
 		if err != nil {
-			Log.Debugf("[%s] connection marshal error: %s", nc.connId, err)
+			nc.log.WithFields(logrus.Fields{
+				"connid": nc.connId,
+				"error":  err,
+			}).Debugf("Connection marshal error")
 			break
 		}
 		buf = append(buf, byte('\r'), byte('\n'))
 		n, err := nc.connTx.Write(buf)
 		if err != nil || n != len(buf) {
-			Log.Debugf("[%s] connection write error: %s", nc.connId, err)
+			nc.log.WithFields(logrus.Fields{
+				"connid": nc.connId,
+				"error":  err,
+			}).Debugf("Connection write error")
 			break
 		}
 	}
-	Log.Debugf("Exit from [%s] sendWorker", nc.connId)
+	nc.log.WithFields(logrus.Fields{
+		"connid": nc.connId,
+	}).Debugf("Exit from sendWorker")
 }
 
 func (nc *NexusConn) recvWorker() {
@@ -305,11 +395,17 @@ func (nc *NexusConn) recvWorker() {
 		}
 		err = nc.pushReq(req)
 		if err != nil {
-			Log.Debugf("Error on [%s] recvWorker: %s", nc.connId, err)
+			nc.log.WithFields(logrus.Fields{
+				"connid": nc.connId,
+				"error":  err,
+			}).Debugf("Error on recvWorker")
 			break
 		}
 	}
-	Log.Debugf("Exit from [%s] recvWorker", nc.connId)
+	nc.log.WithFields(logrus.Fields{
+		"connid": nc.connId,
+	}).Debugf("Exit from recvWorker")
+
 }
 
 func (nc *NexusConn) watchdog() {
@@ -324,7 +420,9 @@ func (nc *NexusConn) watchdog() {
 			if (now-nc.connRx.GetLast() > max) &&
 				(now-nc.connTx.GetLast() > max) {
 				exit = true
-				Log.Warnf("Connection [%s] watch dog expired!", nc.connId)
+				nc.log.WithFields(logrus.Fields{
+					"connid": nc.connId,
+				}).Warnln("Connection watchdog expired!")
 			}
 
 			nc.updateSession()
@@ -342,7 +440,9 @@ func (nc *NexusConn) close() {
 		nc.conn.Close()
 		if mainContext.Err() == nil {
 			if nc.proto != "internal" || LogLevelIs(DebugLevel) {
-				Log.Printf("Closing [%s] session", nc.connId)
+				nc.log.WithFields(logrus.Fields{
+					"connid": nc.connId,
+				}).Printf("Closing session")
 			}
 			dbClean(nc.connId)
 		}
@@ -375,9 +475,14 @@ func (nc *NexusConn) reload(fromSameSession bool) (bool, int) {
 		if err != nil || wres.Replaced == 0 {
 			return false, ErrInternal
 		}
-		Log.Printf("Connection [%s] reloaded by other session", nc.connId)
+		nc.log.WithFields(logrus.Fields{
+			"connid": nc.connId,
+			"error":  err,
+		}).Printf("Connection reloaded by other session")
 	} else {
-		Log.Printf("Connection [%s] reloaded by itself", nc.connId)
+		nc.log.WithFields(logrus.Fields{
+			"connid": nc.connId,
+		}).Printf("Connection reloaded by itself")
 	}
 	return true, 0
 }
@@ -397,7 +502,10 @@ func (nc *NexusConn) updateSession() {
 		RunWrite(db)
 
 	if err != nil {
-		Log.Errorf("Error updating session [%s]: %s", nc.connId, err)
+		nc.log.WithFields(logrus.Fields{
+			"connid": nc.connId,
+			"error":  err,
+		}).Errorln("Error updating session")
 		nc.close()
 	}
 }
@@ -430,28 +538,16 @@ func (nc *NexusConn) handle() {
 	for {
 		req, err := nc.pullReq()
 		if err != nil {
-			Log.Debugf("Error on [%s] connection handler: %s", nc.connId, err)
+			nc.log.WithFields(logrus.Fields{
+				"connid": nc.connId,
+				"error":  err,
+			}).Debug("Error on connection handler")
 			break
 		}
 
 		if (req.Jsonrpc != "2.0" && req.Jsonrpc != "") || req.Method == "" { //"jsonrpc":"2.0" is optional
 			req.Error(ErrInvalidRequest, "", nil)
 			continue
-		}
-
-		if (req.Method != "sys.ping" && nc.proto != "internal") || LogLevelIs(DebugLevel) {
-			if opts.IsProduction {
-				d := JsonRpcReqLog{ID: req.Id, ConnID: req.nc.connId, Method: req.Method, Params: req.Params, Remote: req.nc.conn.RemoteAddr().String()}
-				marshalled, _ := json.Marshal(d)
-				Log.Printf(fmt.Sprintf("%s", marshalled))
-			} else {
-				marshalled, err := json.Marshal(req.Params)
-				if err != nil {
-					Log.Printf("[%s@%s] %s: %#v - id: %.0f", req.nc.connId, req.nc.conn.RemoteAddr(), req.Method, req.Params, req.Id)
-				} else {
-					Log.Printf("[%s@%s] %s: %s - id: %.0f", req.nc.connId, req.nc.conn.RemoteAddr(), req.Method, marshalled, req.Id)
-				}
-			}
 		}
 
 		go nc.handleReq(req)

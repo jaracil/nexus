@@ -10,6 +10,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/Sirupsen/logrus"
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
@@ -226,7 +227,11 @@ func (nc *NexusConn) checkUserLimits(ud *UserData) bool {
 		}
 	}
 	if err != nil || (ud.MaxSessions > 0 && seslen+1 > ud.MaxSessions) {
-		Log.Warnf("User %s has too many sessions opened: %d/%d", ud.User, seslen, ud.MaxSessions)
+		Log.WithFields(logrus.Fields{
+			"user":        ud.User,
+			"current":     seslen,
+			"maxsessions": ud.MaxSessions,
+		}).Warnf("User has too many sessions opened")
 		return false
 	}
 
@@ -235,7 +240,11 @@ func (nc *NexusConn) checkUserLimits(ud *UserData) bool {
 	// Whitelisted?
 	for _, wr := range ud.Whitelist {
 		if match, err := regexp.MatchString(wr, remoteaddr); err == nil && match {
-			Log.Warnf("User %s from %s whitelisted by %s", ud.User, remoteaddr, wr)
+			Log.WithFields(logrus.Fields{
+				"user":      ud.User,
+				"remote":    remoteaddr,
+				"whitelist": wr,
+			}).Warnf("User whitelisted", ud.User, remoteaddr, wr)
 			return true
 		}
 	}
@@ -243,7 +252,11 @@ func (nc *NexusConn) checkUserLimits(ud *UserData) bool {
 	// Blacklisted?
 	for _, br := range ud.Blacklist {
 		if match, err := regexp.MatchString(br, remoteaddr); err == nil && match {
-			Log.Warnf("User %s from %s blacklisted by %s", ud.User, remoteaddr, br)
+			Log.WithFields(logrus.Fields{
+				"user":      ud.User,
+				"remote":    remoteaddr,
+				"blacklist": br,
+			}).Warnf("User blacklisted", ud.User, remoteaddr, br)
 			return false
 		}
 	}

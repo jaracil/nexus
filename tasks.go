@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
@@ -27,6 +28,7 @@ type Task struct {
 	ErrObj       interface{} `gorethink:"errObj,omitempty" json:"errObject"`
 	Tags         interface{} `gorethink:"tags,omitempty" json:"tags"`
 	CreationTime interface{} `gorethink:"creationTime,omitempty" json:"creationTime"`
+	WorkingTime  interface{} `gorethink:"workingTime,omitempty" json:"workingTime"`
 	DeadLine     interface{} `gorethink:"deadLine,omitempty" json:"deadline"`
 }
 
@@ -46,9 +48,9 @@ func taskPurge() {
 				wres, err := r.Table("tasks").
 					Between(r.MinVal, r.Now(), r.BetweenOpts{Index: "deadLine"}).
 					Update(r.Branch(r.Row.Field("stat").Ne("done"),
-					ei.M{"stat": "done", "errCode": ErrTimeout, "errStr": ErrStr[ErrTimeout], "deadLine": r.Now().Add(600)},
-					ei.M{}),
-					r.UpdateOpts{ReturnChanges: true}).
+						ei.M{"stat": "done", "errCode": ErrTimeout, "errStr": ErrStr[ErrTimeout], "deadLine": r.Now().Add(600)},
+						ei.M{}),
+						r.UpdateOpts{ReturnChanges: true}).
 					RunWrite(db, r.RunOpts{Durability: "soft"})
 				if err == nil {
 					for _, change := range wres.Changes {
@@ -82,10 +84,28 @@ func taskTrack() {
 			Between(nodeId, nodeId+"\uffff").
 			Changes(r.ChangesOpts{IncludeInitial: true, Squash: false}).
 			Filter(r.Row.Field("new_val").Ne(nil)).
-			Pluck(ei.M{"new_val": []string{"id", "stat", "localId", "detach", "user", "prio", "ttl", "path", "method", "result", "errCode", "errStr", "errObj"}}).
+			Pluck(ei.M{"new_val": []string{
+				"id",
+				"stat",
+				"localId",
+				"detach",
+				"user",
+				"prio",
+				"ttl",
+				"path",
+				"method",
+				"result",
+				"errCode",
+				"errStr",
+				"errObj",
+				"tses",
+				"creationTime",
+				"workingTime"}}).
 			Run(db)
 		if err != nil {
-			Log.Errorln("Error opening taskTrack iterator:", err.Error())
+			Log.WithFields(logrus.Fields{
+				"error": err.Error(),
+			}).Errorln("Error opening taskTrack iterator")
 			time.Sleep(time.Second)
 			continue
 		}
@@ -93,7 +113,9 @@ func taskTrack() {
 		for {
 			tf := &TaskFeed{}
 			if !iter.Next(tf) {
-				Log.Println("Error processing taskTrack feed:", iter.Err().Error())
+				Log.WithFields(logrus.Fields{
+					"error": iter.Err().Error(),
+				}).Println("Error processing taskTrack feed")
 				iter.Close()
 				break
 			}
@@ -132,9 +154,9 @@ func taskPull(task *Task) bool {
 			Between(ei.S{prefix, "waiting", r.MinVal, r.MinVal}, ei.S{prefix, "waiting", r.MaxVal, r.MaxVal}, r.BetweenOpts{RightBound: "closed", Index: "pspc"}).
 			Limit(1).
 			Update(r.Branch(r.Row.Field("stat").Eq("waiting"),
-			ei.M{"stat": "working", "tses": task.Id[0:16]},
-			ei.M{}),
-			r.UpdateOpts{ReturnChanges: true}).
+				ei.M{"stat": "working", "tses": task.Id[0:16], "workingTime": r.Now()},
+				ei.M{}),
+				r.UpdateOpts{ReturnChanges: true}).
 			RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
 			break
@@ -153,8 +175,8 @@ func taskPull(task *Task) bool {
 			pres, err := r.Table("tasks").
 				Get(task.Id).
 				Update(r.Branch(r.Row.Field("stat").Eq("working"),
-				ei.M{"stat": "done", "result": result, "deadLine": r.Now().Add(600)},
-				ei.M{})).
+					ei.M{"stat": "done", "result": result, "deadLine": r.Now().Add(600)},
+					ei.M{})).
 				RunWrite(db, r.RunOpts{Durability: "soft"})
 			if err != nil || pres.Replaced != 1 {
 				r.Table("tasks").
@@ -178,12 +200,35 @@ func taskPull(task *Task) bool {
 		}
 		break
 	}
+
 	r.Table("tasks").
 		Get(task.Id).
 		Update(r.Branch(r.Row.Field("stat").Eq("working"),
-		ei.M{"stat": "waiting"},
-		ei.M{})).
+			ei.M{"stat": "waiting"},
+			ei.M{})).
 		RunWrite(db, r.RunOpts{Durability: "soft"})
+
+	// On the previous step where the pull transitions from working to waiting
+	// there is a race condition where a push could enter and a single pull on that
+	// path wouldnt be able to notice, and a deadlock would happen.
+	// Here we check again for any task waiting that we could accept, and set ourselves
+	// as working again to restart the loop on taskTrack()
+
+	stuck, _ := r.Table("tasks").
+		OrderBy(r.OrderByOpts{Index: "pspc"}).
+		Between(ei.S{prefix, "waiting", r.MinVal, r.MinVal}, ei.S{prefix, "waiting", r.MaxVal, r.MaxVal}, r.BetweenOpts{RightBound: "closed", Index: "pspc"}).
+		Limit(1).
+		Run(db, r.RunOpts{Durability: "soft"})
+
+	if !stuck.IsNil() {
+		r.Table("tasks").
+			Get(task.Id).
+			Update(r.Branch(r.Row.Field("stat").Eq("waiting"),
+				ei.M{"stat": "working"},
+				ei.M{})).
+			RunWrite(db, r.RunOpts{Durability: "soft"})
+	}
+
 	return false
 }
 
@@ -191,12 +236,12 @@ func taskWakeup(task *Task) bool {
 	for {
 		wres, err := r.Table("tasks").
 			Between(ei.S{"@pull." + task.Path, "waiting", r.MinVal, r.MinVal},
-			ei.S{"@pull." + task.Path, "waiting", r.MaxVal, r.MaxVal},
-			r.BetweenOpts{RightBound: "closed", Index: "pspc"}).
+				ei.S{"@pull." + task.Path, "waiting", r.MaxVal, r.MaxVal},
+				r.BetweenOpts{RightBound: "closed", Index: "pspc"}).
 			Sample(1).
 			Update(r.Branch(r.Row.Field("stat").Eq("waiting"),
-			ei.M{"stat": "working"},
-			ei.M{})).
+				ei.M{"stat": "working"},
+				ei.M{})).
 			RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
 			return false
@@ -234,7 +279,6 @@ func taskExpireTtl(taskid string) {
 }
 
 func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
-	var null *int
 	switch req.Method {
 	case "task.push":
 		method, err := ei.N(req.Params).M("method").Lower().String()
@@ -278,29 +322,36 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			CreationTime: r.Now(),
 			DeadLine:     r.Now().Add(timeout),
 		}
+		nc.log.WithFields(logrus.Fields{
+			"connid": req.nc.connId,
+			"id":     req.Id,
+			"taskid": task.Id,
+		}).Info("taskid generated")
+
 		_, err = r.Table("tasks").Insert(task, r.InsertOpts{}).RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
 		}
 		hook("task", task.Path+task.Method, task.User, ei.M{
-			"action":    "push",
-			"id":        task.Id,
-			"connid":    nc.connId,
-			"user":      nc.user.User,
-			"tags":      nc.user.Tags,
-			"path":      path,
-			"method":    met,
-			"params":    params,
-			"detach":    detach,
-			"ttl":       ttl,
-			"prio":      prio,
-			"timestamp": time.Now().UTC(),
-			"timeout":   timeout,
+			"action":       "push",
+			"id":           task.Id,
+			"connid":       nc.connId,
+			"user":         nc.user.User,
+			"tags":         nc.user.Tags,
+			"path":         path,
+			"method":       met,
+			"params":       params,
+			"detach":       detach,
+			"ttl":          ttl,
+			"prio":         prio,
+			"creationTime": time.Now().UTC(),
+			"timeout":      timeout,
 		})
 		if detach {
 			req.Result(ei.M{"ok": true})
 		}
+
 	case "task.pull":
 		if req.Id == nil {
 			return
@@ -327,7 +378,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			Stat:         "working",
 			Path:         "@pull." + prefix,
 			Method:       "",
-			Params:       null,
+			Params:       nil,
 			LocalId:      req.Id,
 			CreationTime: r.Now(),
 			DeadLine:     r.Now().Add(timeout),
@@ -335,7 +386,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		}
 		_, err := r.Table("tasks").Insert(task).RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
-			req.Error(-32603, "", nil)
+			req.Error(ErrInternal, "", nil)
 			return
 		}
 
@@ -419,9 +470,9 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			Between(nc.connId, nc.connId+"\uffff").
 			Filter(r.Row.Field("localId").Eq(id)).
 			Update(r.Branch(r.Row.Field("stat").Ne("done"),
-			ei.M{"stat": "done", "errCode": ErrCancel, "errStr": ErrStr[ErrCancel], "deadLine": r.Now().Add(600)},
-			ei.M{}),
-			r.UpdateOpts{ReturnChanges: true}).
+				ei.M{"stat": "done", "errCode": ErrCancel, "errStr": ErrStr[ErrCancel], "deadLine": r.Now().Add(600)},
+				ei.M{}),
+				r.UpdateOpts{ReturnChanges: true}).
 			RunWrite(db, r.RunOpts{Durability: "soft"})
 
 		if err != nil {

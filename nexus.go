@@ -6,6 +6,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	. "github.com/jaracil/nexus/log"
 	"golang.org/x/net/context"
 )
@@ -25,7 +26,7 @@ func signalManager() {
 		switch s {
 		case syscall.SIGINT:
 			if listenContext.Err() == nil {
-				Log.Println("Stopping new connections")
+				Log.Warnln("Stopping new connections")
 				listenCancel()
 				go func() {
 					for numconn > 0 {
@@ -53,24 +54,28 @@ func signalManager() {
 
 func exit(cause string) {
 	if mainContext.Err() == nil {
-		Log.Errorln("Daemon exit. Cause:", cause)
+		Log.WithFields(logrus.Fields{
+			"cause": cause,
+		}).Error("Daemon exit")
 		mainCancel()
 	}
 }
 
 func main() {
 	parseOptions()
+	nodeId = safeId(4)
 
-	if opts.Verbose {
+	if len(opts.Verbose) > 0 {
 		SetLogLevel(DebugLevel)
 	} else {
 		SetLogLevel(InfoLevel)
 	}
-
-	nodeId = safeId(4)
 	if opts.IsProduction {
-		Log.Formatter = ProductionFormatter{NodeID: nodeId}
+		customFormatter := new(logrus.JSONFormatter)
+		customFormatter.TimestampFormat = TimestampFormat
+		Logger.Formatter = customFormatter
 	}
+	Log = LogWithNode(nodeId)
 
 	signal.Notify(sigChan)
 	go signalManager()
@@ -78,7 +83,9 @@ func main() {
 	mainContext, mainCancel = context.WithCancel(context.Background())
 	err := dbOpen()
 	if err != nil {
-		Log.Fatal("Error opening RethinkDB connection:", err)
+		Log.WithFields(logrus.Fields{
+			"error": err,
+		}).Fatal("Error opening RethinkDB connection")
 	}
 	defer db.Close()
 
@@ -91,11 +98,17 @@ func main() {
 
 	listen()
 
-	Log.Printf("Nexus node [%s] started", nodeId)
+	Log.WithFields(logrus.Fields{
+		"node": nodeId,
+	}).Print("Nexus node started")
+
 	<-mainContext.Done()
 	cleanNode(nodeId)
 	for numconn > 0 {
 		time.Sleep(time.Second)
 	}
-	Log.Printf("Nexus node [%s] stopped", nodeId)
+
+	Log.WithFields(logrus.Fields{
+		"node": nodeId,
+	}).Print("Nexus node stopped")
 }

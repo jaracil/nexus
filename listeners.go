@@ -3,6 +3,7 @@ package main
 import (
 	"net/url"
 
+	"github.com/Sirupsen/logrus"
 	. "github.com/jaracil/nexus/log"
 	"golang.org/x/net/context"
 )
@@ -36,13 +37,17 @@ func listeners(ctx context.Context) {
 				go healthCheckListener(u, ctx)
 
 			default:
-				Log.Errorln("Unknown listener: ", u)
+				Log.WithFields(logrus.Fields{
+					"listener": u,
+				}).Print("Unknown listener")
 				mainCancel()
 				return
 			}
 
 		} else {
-			Log.Errorln("Couldn't parse listener:", v)
+			Log.WithFields(logrus.Fields{
+				"listener": v,
+			}).Print("Couldn't parse listener")
 			mainCancel()
 			return
 		}
