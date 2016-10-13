@@ -77,7 +77,18 @@ func main() {
 		Logger.Formatter = customFormatter
 	}
 
+	Log = GetLogger(nodeId, opts.Logs.AddSystemInfo)
+
 	if opts.Logs.Path != "" {
+		// Test if file will be accessible
+		fd, err := os.OpenFile(opts.Logs.Path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+		if err != nil {
+			Log.WithFields(logrus.Fields{
+				"error": err,
+			}).Fatalln("Error opening logfile")
+		}
+		fd.Close()
+
 		Logger.Hooks.Add(lfshook.NewHook(lfshook.PathMap{
 			logrus.DebugLevel: opts.Logs.Path,
 			logrus.InfoLevel:  opts.Logs.Path,
@@ -87,8 +98,6 @@ func main() {
 			logrus.PanicLevel: opts.Logs.Path,
 		}))
 	}
-
-	Log = GetLogger(nodeId, opts.Logs.AddSystemInfo)
 
 	signal.Notify(sigChan)
 	go signalManager()
