@@ -156,6 +156,27 @@ func loadUserDataWithTemplates(user string, loadedTemplates map[string]bool) (*U
 		}
 		return nil, ErrInternal
 	}
+
+	if ud.Tags == nil {
+		ud.Tags = make(map[string]map[string]interface{})
+	}
+
+	if ud.Mask == nil {
+		ud.Mask = make(map[string]map[string]interface{})
+	}
+
+	if ud.Blacklist == nil {
+		ud.Blacklist = make([]string, 0)
+	}
+
+	if ud.Whitelist == nil {
+		ud.Whitelist = make([]string, 0)
+	}
+
+	if ud.Templates == nil {
+		ud.Templates = make([]string, 0)
+	}
+
 	grabTemplates(ud, loadedTemplates)
 	return ud, ErrNoError
 }
