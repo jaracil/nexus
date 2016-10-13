@@ -9,11 +9,16 @@ import (
 var opts struct {
 	Verbose      []bool         `short:"v" long:"verbose" description:"Show debug information. Set multiple times to increase verbosity"`
 	Listeners    []string       `short:"l" long:"listen"  description:"Listen on (tcp|tcp+proxy|ssl|ssl+proxy|http|https)://addr:port" default:"tcp://0.0.0.0:1717"`
-	IsProduction bool           `long:"production" description:"Enables Production mode"`
+	IsProduction bool           `long:"production" description:"Enables Production mode (JSON output and redacted logs for login requests)"`
+	Logs         LogsOptions    `group:"Logging Options"`
 	Rethink      RethinkOptions `group:"RethinkDB Options"`
 	SSL          SSLOptions     `group:"SSL Options"`
 }
 
+type LogsOptions struct {
+	Path          string `long:"logfile" description:"Log file"`
+	AddSystemInfo bool   `long:"logsysinfo" description:"Include hostname and pid on logs"`
+}
 type RethinkOptions struct {
 	Hosts      []string `short:"r" long:"rethinkdb" description:"RethinkDB host[:port]" default:"localhost:28015"`
 	Database   string   `short:"d" long:"database" description:"RethinkDB database" default:"nexus"`

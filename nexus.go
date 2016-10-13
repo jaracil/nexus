@@ -8,6 +8,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	. "github.com/jaracil/nexus/log"
+	"github.com/rifflock/lfshook"
 	"golang.org/x/net/context"
 )
 
@@ -75,7 +76,28 @@ func main() {
 		customFormatter.TimestampFormat = TimestampFormat
 		Logger.Formatter = customFormatter
 	}
-	Log = LogWithNode(nodeId)
+
+	Log = GetLogger(nodeId, opts.Logs.AddSystemInfo)
+
+	if opts.Logs.Path != "" {
+		// Test if file will be accessible
+		fd, err := os.OpenFile(opts.Logs.Path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+		if err != nil {
+			Log.WithFields(logrus.Fields{
+				"error": err,
+			}).Fatalln("Error opening logfile")
+		}
+		fd.Close()
+
+		Logger.Hooks.Add(lfshook.NewHook(lfshook.PathMap{
+			logrus.DebugLevel: opts.Logs.Path,
+			logrus.InfoLevel:  opts.Logs.Path,
+			logrus.WarnLevel:  opts.Logs.Path,
+			logrus.ErrorLevel: opts.Logs.Path,
+			logrus.FatalLevel: opts.Logs.Path,
+			logrus.PanicLevel: opts.Logs.Path,
+		}))
+	}
 
 	signal.Notify(sigChan)
 	go signalManager()
@@ -98,9 +120,7 @@ func main() {
 
 	listen()
 
-	Log.WithFields(logrus.Fields{
-		"node": nodeId,
-	}).Print("Nexus node started")
+	Log.Println("Nexus node started")
 
 	<-mainContext.Done()
 	cleanNode(nodeId)
@@ -108,7 +128,5 @@ func main() {
 		time.Sleep(time.Second)
 	}
 
-	Log.WithFields(logrus.Fields{
-		"node": nodeId,
-	}).Print("Nexus node stopped")
+	Log.Println("Nexus node stopped")
 }

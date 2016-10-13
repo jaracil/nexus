@@ -3,6 +3,7 @@ package log
 
 import (
 	"io/ioutil"
+	"os"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -80,11 +81,22 @@ func LogLevelIs(l uint8) bool {
 	return GetLogLevel() == l
 }
 
-func LogWithNode(node string) *logrus.Entry {
-	return Logger.WithFields(logrus.Fields{
+func GetLogger(node string, sysinfo bool) *logrus.Entry {
+	e := Logger.WithFields(logrus.Fields{
 		"node": node,
 		"type": "system",
 	})
+
+	if sysinfo {
+		if h, err := os.Hostname(); err == nil {
+			e = e.WithFields(logrus.Fields{
+				"host": h,
+				"pid":  os.Getpid(),
+			})
+		}
+	}
+
+	return e
 }
 
 func LogDiscard() *logrus.Entry {
