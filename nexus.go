@@ -8,6 +8,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	. "github.com/jaracil/nexus/log"
+	"github.com/rifflock/lfshook"
 	"golang.org/x/net/context"
 )
 
@@ -75,6 +76,18 @@ func main() {
 		customFormatter.TimestampFormat = TimestampFormat
 		Logger.Formatter = customFormatter
 	}
+
+	if opts.LogPath != "" {
+		Logger.Hooks.Add(lfshook.NewHook(lfshook.PathMap{
+			logrus.DebugLevel: opts.LogPath,
+			logrus.InfoLevel:  opts.LogPath,
+			logrus.WarnLevel:  opts.LogPath,
+			logrus.ErrorLevel: opts.LogPath,
+			logrus.FatalLevel: opts.LogPath,
+			logrus.PanicLevel: opts.LogPath,
+		}))
+	}
+
 	Log = LogWithNode(nodeId)
 
 	signal.Notify(sigChan)

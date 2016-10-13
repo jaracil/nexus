@@ -9,7 +9,8 @@ import (
 var opts struct {
 	Verbose      []bool         `short:"v" long:"verbose" description:"Show debug information. Set multiple times to increase verbosity"`
 	Listeners    []string       `short:"l" long:"listen"  description:"Listen on (tcp|tcp+proxy|ssl|ssl+proxy|http|https)://addr:port" default:"tcp://0.0.0.0:1717"`
-	IsProduction bool           `long:"production" description:"Enables Production mode"`
+	LogPath      string         `long:"logfile" description:"Log file"`
+	IsProduction bool           `long:"production" description:"Enables Production mode (JSON output and redacted logs for login requests)"`
 	Rethink      RethinkOptions `group:"RethinkDB Options"`
 	SSL          SSLOptions     `group:"SSL Options"`
 }
