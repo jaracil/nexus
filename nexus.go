@@ -77,18 +77,18 @@ func main() {
 		Logger.Formatter = customFormatter
 	}
 
-	if opts.LogPath != "" {
+	if opts.Logs.Path != "" {
 		Logger.Hooks.Add(lfshook.NewHook(lfshook.PathMap{
-			logrus.DebugLevel: opts.LogPath,
-			logrus.InfoLevel:  opts.LogPath,
-			logrus.WarnLevel:  opts.LogPath,
-			logrus.ErrorLevel: opts.LogPath,
-			logrus.FatalLevel: opts.LogPath,
-			logrus.PanicLevel: opts.LogPath,
+			logrus.DebugLevel: opts.Logs.Path,
+			logrus.InfoLevel:  opts.Logs.Path,
+			logrus.WarnLevel:  opts.Logs.Path,
+			logrus.ErrorLevel: opts.Logs.Path,
+			logrus.FatalLevel: opts.Logs.Path,
+			logrus.PanicLevel: opts.Logs.Path,
 		}))
 	}
 
-	Log = LogWithNode(nodeId)
+	Log = GetLogger(nodeId, opts.Logs.AddSystemInfo)
 
 	signal.Notify(sigChan)
 	go signalManager()
@@ -111,9 +111,7 @@ func main() {
 
 	listen()
 
-	Log.WithFields(logrus.Fields{
-		"node": nodeId,
-	}).Print("Nexus node started")
+	Log.Println("Nexus node started")
 
 	<-mainContext.Done()
 	cleanNode(nodeId)
@@ -121,7 +119,5 @@ func main() {
 		time.Sleep(time.Second)
 	}
 
-	Log.WithFields(logrus.Fields{
-		"node": nodeId,
-	}).Print("Nexus node stopped")
+	Log.Println("Nexus node stopped")
 }
