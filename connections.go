@@ -185,7 +185,7 @@ func (nc *NexusConn) pushReq(req *JsonRpcReq) (err error) {
 			if opts.IsProduction {
 				switch req.Method {
 				case "sys.login":
-					e = e.WithField("params", "hidden")
+					e = e.WithField("params", make(map[string]interface{}))
 				}
 			}
 
