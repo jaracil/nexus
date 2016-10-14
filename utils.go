@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 
@@ -118,4 +119,13 @@ func truncateJson(j interface{}) interface{} {
 		}
 	}
 	return fmt.Sprintf("Unknown JSON type: %s", reflect.TypeOf(j))
+}
+
+func roundHelper(num float64) int {
+	return int(num + math.Copysign(0.5, num))
+}
+
+func round(num float64, precision int) float64 {
+	output := math.Pow(10, float64(precision))
+	return float64(roundHelper(num*output)) / output
 }

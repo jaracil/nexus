@@ -240,7 +240,7 @@ func taskWakeup(task *Task) bool {
 				r.BetweenOpts{RightBound: "closed", Index: "pspc"}).
 			Sample(1).
 			Update(r.Branch(r.Row.Field("stat").Eq("waiting"),
-				ei.M{"stat": "working"},
+				ei.M{"stat": "working", "workingTime": r.Now()},
 				ei.M{})).
 			RunWrite(db, r.RunOpts{Durability: "soft"})
 		if err != nil {
