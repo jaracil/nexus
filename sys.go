@@ -36,6 +36,9 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 			if wdt < 10 {
 				wdt = 10
 			}
+			if wdt > 1800 {
+				wdt = 1800
+			}
 			atomic.StoreInt64(&nc.wdog, wdt)
 		}
 		req.Result(ei.M{"watchdog": nc.wdog})

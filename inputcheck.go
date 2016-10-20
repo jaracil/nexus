@@ -2,12 +2,13 @@ package main
 
 import (
 	"errors"
-	"github.com/jaracil/ei"
 	"regexp"
+
+	"github.com/jaracil/ei"
 )
 
 const (
-	_userRegexp     = "^[a-zA-Z][a-zA-Z0-9-_.]*"
+	_userRegexp     = "^[a-zA-Z0-9][a-zA-Z0-9-_.]*"
 	_userMinLen     = 3
 	_userMaxLen     = 500
 	_passwordMinLen = 4
