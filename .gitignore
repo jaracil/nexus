@@ -1,1 +1,5 @@
 nexus
+*.crt
+*.key
+scripts/*
+!scripts/*.sh
