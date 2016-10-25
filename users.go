@@ -121,13 +121,15 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidUser, "", nil)
 			return
 		}
-		hook("user", user, nc.user.User, ei.M{
-			"action":  "setTags",
-			"user":    user,
-			"prefix":  prefix,
-			"addTags": tgs,
-			"tags":    ei.N(res.Changes[0].NewValue).M("tags").MapStrZ(),
-		})
+		if res.Replaced > 0 {
+			hook("user", user, nc.user.User, ei.M{
+				"action":  "setTags",
+				"user":    user,
+				"prefix":  prefix,
+				"addTags": tgs,
+				"tags":    ei.N(res.Changes[0].NewValue).M("tags").MapStrZ(),
+			})
+		}
 		req.Result(map[string]interface{}{"ok": true})
 	case "user.delTags":
 		user, err := ei.N(req.Params).M("user").Lower().String()
@@ -150,7 +152,22 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		res, err := r.Table("users").Get(user).Update(map[string]interface{}{"tags": map[string]interface{}{prefix: r.Literal(r.Row.Field("tags").Field(prefix).Without(tgs))}}, r.UpdateOpts{ReturnChanges: true}).RunWrite(db, r.RunOpts{Durability: "hard"})
+
+		res, err := r.Table("users").Get(user).Replace(func(source r.Term) r.Term {
+			return r.Branch(
+				source.HasFields("tags"),
+				r.Branch(
+					source.Field("tags").HasFields(prefix),
+					r.Branch(
+						source.Field("tags").Field(prefix).Without(tgs).Count().Ne(0),
+						source.Merge(ei.M{"tags": ei.M{prefix: r.Literal(source.Field("tags").Field(prefix).Without(tgs))}}),
+						source.Merge(ei.M{"tags": r.Literal(source.Field("tags").Without(prefix))}),
+					),
+					source.Merge(ei.M{}),
+				),
+				source.Merge(ei.M{"tags": r.Literal(ei.M{})}),
+			)
+		}, r.ReplaceOpts{ReturnChanges: true}).RunWrite(db, r.RunOpts{Durability: "hard"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
@@ -159,13 +176,15 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidUser, "", nil)
 			return
 		}
-		hook("user", user, nc.user.User, ei.M{
-			"action":  "delTags",
-			"user":    user,
-			"prefix":  prefix,
-			"delTags": tgs,
-			"tags":    ei.N(res.Changes[0].NewValue).M("tags").MapStrZ(),
-		})
+		if res.Replaced > 0 {
+			hook("user", user, nc.user.User, ei.M{
+				"action":  "delTags",
+				"user":    user,
+				"prefix":  prefix,
+				"delTags": tgs,
+				"tags":    ei.N(res.Changes[0].NewValue).M("tags").MapStrZ(),
+			})
+		}
 		req.Result(map[string]interface{}{"ok": true})
 
 	case "user.setPass":
@@ -199,11 +218,13 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidUser, "", nil)
 			return
 		}
-		hook("user", user, nc.user.User, ei.M{
-			"action": "setPass",
-			"user":   user,
-			"pass":   pass,
-		})
+		if res.Replaced > 0 {
+			hook("user", user, nc.user.User, ei.M{
+				"action": "setPass",
+				"user":   user,
+				"pass":   pass,
+			})
+		}
 		req.Result(map[string]interface{}{"ok": true})
 
 	case "user.list":
@@ -359,10 +380,12 @@ func (nc *NexusConn) userChangeParam(req *JsonRpcReq, param interface{}, field, 
 		req.Error(ErrInvalidUser, "", nil)
 		return
 	}
-	hook("user", user, nc.user.User, ei.M{
-		"action": strings.TrimPrefix(req.Method, "user."),
-		action:   param,
-		field:    ei.N(res.Changes[0].NewValue).M(field),
-	})
+	if res.Replaced > 0 {
+		hook("user", user, nc.user.User, ei.M{
+			"action": strings.TrimPrefix(req.Method, "user."),
+			action:   param,
+			field:    ei.N(res.Changes[0].NewValue).M(field),
+		})
+	}
 	req.Result(map[string]interface{}{"ok": true})
 }
