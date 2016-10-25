@@ -152,7 +152,22 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		res, err := r.Table("users").Get(user).Update(map[string]interface{}{"tags": map[string]interface{}{prefix: r.Literal(r.Row.Field("tags").Field(prefix).Without(tgs))}}, r.UpdateOpts{ReturnChanges: true}).RunWrite(db, r.RunOpts{Durability: "hard"})
+
+		res, err := r.Table("users").Get(user).Replace(func(source r.Term) r.Term {
+			return r.Branch(
+				source.HasFields("tags"),
+				r.Branch(
+					source.Field("tags").HasFields(prefix),
+					r.Branch(
+						source.Field("tags").Field(prefix).Without(tgs).Count().Ne(0),
+						source.Merge(ei.M{"tags": ei.M{prefix: r.Literal(source.Field("tags").Field(prefix).Without(tgs))}}),
+						source.Merge(ei.M{"tags": r.Literal(source.Field("tags").Without(prefix))}),
+					),
+					source.Merge(ei.M{}),
+				),
+				source.Merge(ei.M{"tags": r.Literal(ei.M{})}),
+			)
+		}, r.ReplaceOpts{ReturnChanges: true}).RunWrite(db, r.RunOpts{Durability: "hard"})
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
