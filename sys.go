@@ -14,7 +14,7 @@ import (
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
-	"github.com/jaracil/nxcli/nxcore"
+	"github.com/nayarsystems/nxgo/nxcore"
 )
 
 type LoginResponse struct {

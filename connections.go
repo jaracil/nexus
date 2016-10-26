@@ -14,8 +14,8 @@ import (
 	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
-	"github.com/jaracil/nxcli/nxcore"
 	"github.com/jaracil/smartio"
+	"github.com/nayarsystems/nxgo/nxcore"
 	"golang.org/x/net/context"
 )
 
