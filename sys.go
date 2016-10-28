@@ -114,7 +114,7 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 			"whitelist":   nc.user.Whitelist,
 			"blacklist":   nc.user.Blacklist,
 		})
-		req.Result(ei.M{"ok": true, "user": nc.user.User, "connid": nc.connId})
+		req.Result(ei.M{"ok": true, "user": nc.user.User, "connid": nc.connId, "tags": nc.user.Tags})
 
 	default:
 		req.Error(ErrMethodNotFound, "", nil)

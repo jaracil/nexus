@@ -1,4 +1,9 @@
 # Versions
+
+## 1.1.0
+  * `sys.login` also returns the current tags of the user
+
+
 ## 1.0.0
 ### New:
   * `user.addWhitelist`
@@ -146,7 +151,7 @@ Else, the specified method should document which fields its expecting
 
 
 ### Result:
-      "result": { "ok": true, "connid": <string>, "user": <string> }
+      "result": { "ok": true, "connid": <string>, "user": <string>, "tags": <Object>}
 
 ## sys.node.list
 List the nexus nodes connected to the cluster. Includes some info about connected clients, CPU load and nexus version for each node.
