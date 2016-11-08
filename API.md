@@ -1,5 +1,8 @@
 # Versions
 
+## 1.2.0
+  * `user.getTags` added. 
+
 ## 1.1.0
   * `sys.login` also returns the current tags of the user
 
@@ -97,6 +100,7 @@
     * [user.list](#userlist)
     * [user.setTags](#usersettags)
     * [user.delTags](#userdeltags)
+    * [user.getTags](#usergettags)
     * [user.setPass](#usersetpass)
     * [user.addTemplate](#useraddtemplate)
     * [user.delTemplate](#userdeltemplate)
@@ -434,6 +438,15 @@ Remove a tag from an user on a prefix
 
 ### Result:
     "result": { "ok": true }
+
+## user.getTags
+Return the list of tags result from merging the user tags with the tags being inherited by the templates
+
+### Parameters:
+* `"user": <String>` - Username of the user to get the tags from
+
+### Result:
+    "result": { "tags": { "test": { "@task.pull": true, "@task.push": true }}}
 
 ## user.setPass
 Set the user password for basic auth

@@ -6,7 +6,7 @@ import (
 
 var Version = &NxVersion{
 	Major: 1,
-	Minor: 3,
+	Minor: 4,
 	Patch: 0,
 }
 
