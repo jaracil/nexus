@@ -379,6 +379,13 @@ func (nc *NexusConn) userChangeParam(req *JsonRpcReq, param interface{}, field, 
 		req.Error(ErrPermissionDenied, "", nil)
 		return
 	}
+	if field == "templates" {
+		templateTags := ei.N(nc.getTags(ei.N(param).StringZ()))
+		if !(templateTags.M("@user.useTemplate").BoolZ() || templateTags.M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+	}
 
 	term := r.Table("users").Get(user)
 	switch action {
