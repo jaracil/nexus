@@ -43,6 +43,13 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 		}
 		req.Result(ei.M{"watchdog": nc.wdog})
 
+	case "sys.reload":
+		if done, errcode := nc.reload(true); !done {
+			req.Error(errcode, "", nil)
+		} else {
+			req.Result(ei.M{"ok": true})
+		}
+
 	case "sys.login":
 		var user string
 		var mask map[string]map[string]interface{}

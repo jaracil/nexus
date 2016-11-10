@@ -453,7 +453,7 @@ func (nc *NexusConn) close() {
 }
 
 func (nc *NexusConn) reload(fromSameSession bool) (bool, int) {
-	if nc.user == nil {
+	if nc.user == nil || nc.user == Nobody {
 		return false, ErrInvalidRequest
 	}
 	ud, err := loadUserData(nc.user.User)
