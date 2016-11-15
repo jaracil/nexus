@@ -223,6 +223,10 @@ func mergeTags(src, dst *UserData) {
 }
 
 func (nc *NexusConn) checkUserLimits(ud *UserData) bool {
+	if ud.Disabled {
+		return false
+	}
+
 	nci := NewInternalClient()
 	defer nci.Close()
 

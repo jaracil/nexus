@@ -1,11 +1,13 @@
 # Versions
 
 ## 1.2.0
-  * `user.getTags` added. 
+### New:
+  * `user.getTags`
+  * `user.setDisabled`
 
 ## 1.1.0
+### Modified:
   * `sys.login` also returns the current tags of the user
-
 
 ## 1.0.0
 ### New:
@@ -109,6 +111,7 @@
     * [user.addBlacklist](#useraddblacklist)
     * [user.delBlacklist](#userdelblacklist)
     * [user.setMaxSessions](#usersetmaxsessions)
+    * [user.setDisabled](#usersetdisabled)
 
 # System
 
@@ -524,6 +527,16 @@ Set the maximum number of parallel sessions active of an user
 ### Parameters:
 * `"user": <String>` - Username of the user
 * `"maxsessions": <Number>` - Number of maximum sessions
+
+### Result:
+    "result": { "ok": true }
+
+## user.setDisabled
+A disabled user cannot login
+
+### Parameters:
+* `"user": <String>` - Username of the user
+* `"disabled": <Bool>` - Enable/Disable the login
 
 ### Result:
     "result": { "ok": true }

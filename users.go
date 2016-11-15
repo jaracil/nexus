@@ -19,6 +19,7 @@ type UserData struct {
 	MaxSessions int                               `gorethink:"maxsessions,omitempty"`
 	Whitelist   []string                          `gorethink:"whitelist,omitempty"`
 	Blacklist   []string                          `gorethink:"blacklist,omitempty"`
+	Disabled    bool                              `gorethink:"disabled,omitempty"`
 }
 
 var Nobody *UserData = &UserData{User: "nobody", Tags: map[string]map[string]interface{}{}, MaxSessions: 100000}
@@ -33,17 +34,22 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidParams, "user", nil)
 			return
 		}
+		disabled := ei.N(req.Params).M("disabled").BoolZ()
 		pass, err := ei.N(req.Params).M("pass").F(checkLen, _passwordMinLen, _passwordMaxLen).String()
 		if err != nil {
-			req.Error(ErrInvalidParams, "pass", nil)
-			return
+			if disabled {
+				pass = safeId(64)
+			} else {
+				req.Error(ErrInvalidParams, "pass", nil)
+				return
+			}
 		}
 		tags := nc.getTags(user)
 		if !(ei.N(tags).M("@"+req.Method).BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		ud := UserData{User: user, Salt: safeId(16), Tags: map[string]map[string]interface{}{}, Templates: []string{}, MaxSessions: DEFAULT_MAX_SESSIONS}
+		ud := UserData{User: user, Salt: safeId(16), Tags: map[string]map[string]interface{}{}, Templates: []string{}, MaxSessions: DEFAULT_MAX_SESSIONS, Disabled: disabled}
 		ud.Pass, err = HashPass(pass, ud.Salt)
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
@@ -266,7 +272,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		}
 		term := r.Table("users").
 			Between(prefix, prefix+"\uffff").
-			Pluck("id", "tags", "templates", "whitelist", "blacklist", "maxsessions")
+			Pluck("id", "tags", "templates", "whitelist", "blacklist", "maxsessions", "disabled")
 
 		if skip >= 0 {
 			term = term.Skip(skip)
@@ -284,6 +290,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 				"whitelist":   row.Field("whitelist").Default(ei.S{}),
 				"blacklist":   row.Field("blacklist").Default(ei.S{}),
 				"maxsessions": row.Field("maxsessions").Default(DEFAULT_MAX_SESSIONS),
+				"disabled":    row.Field("disabled").Default(false),
 			}
 		}).Run(db)
 		if err != nil {
@@ -349,6 +356,14 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			return
 		}
 		nc.userSetParam(req, param, "maxsessions")
+
+	case "user.setDisabled":
+		param, err := ei.N(req.Params).M("disabled").Bool()
+		if err != nil {
+			req.Error(ErrInvalidParams, "disabled", nil)
+			return
+		}
+		nc.userSetParam(req, param, "disabled")
 
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
