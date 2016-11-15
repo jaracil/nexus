@@ -34,22 +34,17 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidParams, "user", nil)
 			return
 		}
-		disabled := ei.N(req.Params).M("disabled").BoolZ()
 		pass, err := ei.N(req.Params).M("pass").F(checkLen, _passwordMinLen, _passwordMaxLen).String()
 		if err != nil {
-			if disabled {
-				pass = safeId(64)
-			} else {
-				req.Error(ErrInvalidParams, "pass", nil)
-				return
-			}
+			req.Error(ErrInvalidParams, "pass", nil)
+			return
 		}
 		tags := nc.getTags(user)
 		if !(ei.N(tags).M("@"+req.Method).BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		ud := UserData{User: user, Salt: safeId(16), Tags: map[string]map[string]interface{}{}, Templates: []string{}, MaxSessions: DEFAULT_MAX_SESSIONS, Disabled: disabled}
+		ud := UserData{User: user, Salt: safeId(16), Tags: map[string]map[string]interface{}{}, Templates: []string{}, MaxSessions: DEFAULT_MAX_SESSIONS, Disabled: false}
 		ud.Pass, err = HashPass(pass, ud.Salt)
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
