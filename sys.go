@@ -97,7 +97,7 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 			return
 		}
 
-		if !nc.checkUserLimits(ud) || ud.Disabled {
+		if !nc.checkUserLimits(ud) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
@@ -223,6 +223,10 @@ func mergeTags(src, dst *UserData) {
 }
 
 func (nc *NexusConn) checkUserLimits(ud *UserData) bool {
+	if ud.Disabled {
+		return false
+	}
+
 	nci := NewInternalClient()
 	defer nci.Close()
 
