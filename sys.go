@@ -97,7 +97,7 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 			return
 		}
 
-		if !nc.checkUserLimits(ud) {
+		if !nc.checkUserLimits(ud) || ud.Disabled {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
