@@ -127,30 +127,80 @@ func (req *JsonRpcReq) Result(result interface{}) {
 
 }
 
+func (nc *NexusConn) logRes(res *JsonRpcRes) {
+	if res.req != nil {
+		wf := nc.log.WithFields(logrus.Fields{
+			"connid": nc.connId,
+			"id":     res.Id,
+			"type":   "response",
+			"remote": nc.conn.RemoteAddr().String(),
+			"proto":  nc.proto,
+		})
+		switch res.req.Method {
+		// Do not log verbose actions
+		case "pipe.read", "pipe.write", "sys.ping":
+			if !LogLevelIs(DebugLevel) {
+				return
+			}
+		}
+
+		if res.Error != nil {
+			wf.WithFields(logrus.Fields{
+				"code":    res.Error.Code,
+				"message": res.Error.Message,
+				"data":    res.Error.Data,
+			}).Info("<< error")
+
+		} else {
+			switch res.req.Method {
+
+			// Do not log verbose results
+			case "user.list", "task.list", "sys.session.list":
+
+			default:
+				wf = wf.WithFields(logrus.Fields{
+					"result": res.Result,
+				})
+			}
+			wf.Info("<< result")
+		}
+	}
+}
+
+func (nc *NexusConn) logReq(req *JsonRpcReq) {
+	e := nc.log.WithFields(logrus.Fields{
+		"connid": req.nc.connId,
+		"id":     req.Id,
+		"method": req.Method,
+		"remote": req.nc.conn.RemoteAddr().String(),
+		"proto":  nc.proto,
+		"params": truncateJson(req.Params),
+		"type":   "request",
+	})
+
+	// Fine tuning of logged fields
+	if opts.IsProduction {
+		switch req.Method {
+
+		// Hide sensible parameters
+		case "sys.login", "user.setPass":
+			e = e.WithField("params", make(map[string]interface{}))
+
+		// Do not log verbose actions
+		case "pipe.read", "pipe.write", "sys.ping":
+			if !LogLevelIs(DebugLevel) {
+				return
+			}
+		}
+	}
+
+	e.Infof(">> %s", req.Method)
+}
+
 func (nc *NexusConn) pushRes(res *JsonRpcRes) (err error) {
 	select {
 	case nc.chRes <- res:
-		if res.req == nil || res.req.Method != "sys.ping" || LogLevelIs(DebugLevel) {
-			wf := nc.log.WithFields(logrus.Fields{
-				"connid": nc.connId,
-				"id":     res.Id,
-				"type":   "response",
-				"remote": nc.conn.RemoteAddr().String(),
-				"proto":  nc.proto,
-			})
-
-			if res.Error != nil {
-				wf.WithFields(logrus.Fields{
-					"code":    res.Error.Code,
-					"message": res.Error.Message,
-					"data":    res.Error.Data,
-				}).Info("<< error")
-			} else {
-				wf.WithFields(logrus.Fields{
-					"result": res.Result,
-				}).Info("<< result")
-			}
-		}
+		nc.logRes(res)
 
 	case <-nc.context.Done():
 		err = errors.New("Context cancelled")
@@ -170,27 +220,8 @@ func (nc *NexusConn) pullRes() (res *JsonRpcRes, err error) {
 func (nc *NexusConn) pushReq(req *JsonRpcReq) (err error) {
 	select {
 	case nc.chReq <- req:
-		if req.Method != "sys.ping" || LogLevelIs(DebugLevel) {
-			e := nc.log.WithFields(logrus.Fields{
-				"connid": req.nc.connId,
-				"id":     req.Id,
-				"method": req.Method,
-				"remote": req.nc.conn.RemoteAddr().String(),
-				"proto":  nc.proto,
-				"params": truncateJson(req.Params),
-				"type":   "request",
-			})
+		nc.logReq(req)
 
-			// Fine tuning of logged fields
-			if opts.IsProduction {
-				switch req.Method {
-				case "sys.login":
-					e = e.WithField("params", make(map[string]interface{}))
-				}
-			}
-
-			e.Infof(">> %s", req.Method)
-		}
 	case <-nc.context.Done():
 		err = errors.New("Context cancelled")
 	}
