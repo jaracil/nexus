@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -43,6 +44,10 @@ func nodeTrack() {
 		}).Errorf("Error, can't insert on nodes table")
 		return
 	}
+
+	var masterCtx context.Context
+	var masterCancel context.CancelFunc
+
 	// WatchDog loop
 	tick := time.NewTicker(time.Second * 3)
 	defer tick.Stop()
@@ -113,64 +118,78 @@ func nodeTrack() {
 						if !isMasterNode() {
 							Log.Printf("I'm the master node now")
 							setMasterNode(true)
+
+							masterCtx, masterCancel = context.WithCancel(context.Background())
+							go searchOrphaned(masterCtx)
 						}
 					} else {
 						if isMasterNode() {
 							Log.Printf("I'm NOT the master node anymore")
 							setMasterNode(false)
+							masterCancel()
 						}
 					}
 				}
-			}
-
-			if isMasterNode() {
-				searchOrphaned()
 			}
 
 		case <-mainContext.Done():
 			exit = true
 		}
 	}
+
+	if masterCancel != nil {
+		masterCancel()
+	}
+
 	r.Table("nodes").
 		Get(nodeId).
 		Update(ei.M{"kill": true}).
 		RunWrite(db)
 }
 
-func searchOrphaned() {
+func searchOrphaned(ctx context.Context) {
+	t := time.After(time.Second)
+	for {
+		select {
+		case <-ctx.Done():
+			return
 
-	nodes := make([]map[string]interface{}, 0)
-	tcur, err := r.Table("nodes").Pluck("id").Run(db)
-	if err != nil {
-		Log.WithFields(logrus.Fields{
-			"error": err,
-		}).Errorf("Error listing nodes")
-		return
-	}
-	tcur.All(&nodes)
-
-	var nodesregexp string
-	// (^node1|^node2|^node3)
-	if len(nodes) > 0 {
-		nodesregexp = "("
-		for k, node := range nodes {
-			nodesregexp = fmt.Sprintf("%s^%s", nodesregexp, node["id"])
-
-			if k < len(nodes)-1 {
-				nodesregexp = fmt.Sprintf("%s|", nodesregexp)
-			} else {
-				nodesregexp = fmt.Sprintf("%s)", nodesregexp)
+		case <-t:
+			t = time.After(time.Minute)
+			nodes := make([]map[string]interface{}, 0)
+			tcur, err := r.Table("nodes").Pluck("id").Run(db)
+			if err != nil {
+				Log.WithFields(logrus.Fields{
+					"error": err,
+				}).Errorf("Error listing nodes")
+				return
 			}
-		}
-	} else {
-		Log.Errorf("Length of nodes list is 0... who am I??")
-		return
-	}
+			tcur.All(&nodes)
 
-	searchOrphanedStuff(nodesregexp, "sessions", "nodeId")
-	searchOrphanedStuff(nodesregexp, "tasks", "id")
-	searchOrphanedStuff(nodesregexp, "pipes", "id")
-	searchOrphanedStuff(nodesregexp, "locks", "owner")
+			var nodesregexp string
+			// (^node1|^node2|^node3)
+			if len(nodes) > 0 {
+				nodesregexp = "("
+				for k, node := range nodes {
+					nodesregexp = fmt.Sprintf("%s^%s", nodesregexp, node["id"])
+
+					if k < len(nodes)-1 {
+						nodesregexp = fmt.Sprintf("%s|", nodesregexp)
+					} else {
+						nodesregexp = fmt.Sprintf("%s)", nodesregexp)
+					}
+				}
+			} else {
+				Log.Errorf("Length of nodes list is 0... who am I??")
+				return
+			}
+
+			searchOrphanedStuff(nodesregexp, "sessions", "nodeId")
+			searchOrphanedStuff(nodesregexp, "tasks", "id")
+			searchOrphanedStuff(nodesregexp, "pipes", "id")
+			searchOrphanedStuff(nodesregexp, "locks", "owner")
+		}
+	}
 }
 
 func searchOrphanedStuff(regex, what, field string) {
