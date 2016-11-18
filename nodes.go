@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -122,6 +123,10 @@ func nodeTrack() {
 				}
 			}
 
+			if isMasterNode() {
+				searchOrphaned()
+			}
+
 		case <-mainContext.Done():
 			exit = true
 		}
@@ -130,6 +135,94 @@ func nodeTrack() {
 		Get(nodeId).
 		Update(ei.M{"kill": true}).
 		RunWrite(db)
+}
+
+func searchOrphaned() {
+
+	nodes := make([]map[string]interface{}, 0)
+	tcur, err := r.Table("nodes").Pluck("id").Run(db)
+	if err != nil {
+		Log.WithFields(logrus.Fields{
+			"error": err,
+		}).Errorf("Error listing nodes")
+		return
+	}
+	tcur.All(&nodes)
+
+	var nodesregexp string
+	// (^node1|^node2|^node3)
+	if len(nodes) > 0 {
+		nodesregexp = "("
+		for k, node := range nodes {
+			nodesregexp = fmt.Sprintf("%s^%s", nodesregexp, node["id"])
+
+			if k < len(nodes)-1 {
+				nodesregexp = fmt.Sprintf("%s|", nodesregexp)
+			} else {
+				nodesregexp = fmt.Sprintf("%s)", nodesregexp)
+			}
+		}
+	} else {
+		Log.Errorf("Length of nodes list is 0... who am I??")
+		return
+	}
+
+	searchOrphanedStuff(nodesregexp, "sessions", "nodeId")
+	searchOrphanedStuff(nodesregexp, "tasks", "id")
+	searchOrphanedStuff(nodesregexp, "pipes", "id")
+	searchOrphanedStuff(nodesregexp, "locks", "owner")
+}
+
+func searchOrphanedStuff(regex, what, field string) {
+
+	orphaned, err := r.Table(what).Filter(func(ses r.Term) r.Term {
+		return ses.Field(field).Match(regex).Not()
+	}).Run(db)
+	if err != nil {
+		Log.WithFields(logrus.Fields{
+			"error": err,
+		}).Errorf("Error searching orphaned %s", what)
+		return
+	}
+
+	orphans := make([]interface{}, 0)
+	err = orphaned.All(&orphans)
+
+	switch err {
+	default:
+		Log.WithFields(logrus.Fields{
+			"error": err,
+		}).Errorf("Error searching orphaned %s", what)
+
+	case r.ErrEmptyResult:
+
+	case nil:
+		if len(orphans) <= 0 {
+			return
+		}
+
+		o := make([]string, 0)
+		for _, e := range orphans {
+			if om, ok := e.(map[string]interface{}); ok {
+				o = append(o, fmt.Sprintf("%s", om[field])[:8])
+			}
+		}
+
+		Log.WithFields(logrus.Fields{
+			"orphans": o,
+		}).Warnf("Found %d orphaned %s", len(o), what)
+
+		for _, s := range o {
+			err := dbClean(s)
+
+			if err != nil {
+				Log.WithFields(logrus.Fields{
+					"error": err,
+					what:    s,
+				}).Errorln("Error deleting orphaned %s", what)
+			}
+		}
+	}
 }
 
 func cleanNode(node string) {
