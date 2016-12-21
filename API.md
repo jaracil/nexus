@@ -1,4 +1,8 @@
 # Versions
+## 1.4.x
+  * Bump version to align numbers with server/clients.
+### New:
+  * `sys.reload` is back to reload a connection's own session without permissions
 
 ## 1.2.0
 ### New:
