@@ -307,10 +307,8 @@ func (nc *NexusConn) respWorker() {
 			case *Task:
 
 				if !strings.HasPrefix(res.Path, "@pull.") {
-					cT, _ := res.CreationTime.(time.Time)
-					wT, _ := res.WorkingTime.(time.Time)
 
-					nc.log.WithFields(logrus.Fields{
+					i := nc.log.WithFields(logrus.Fields{
 						"type":          "metric",
 						"kind":          "taskCompleted",
 						"connid":        nc.connId,
@@ -320,9 +318,22 @@ func (nc *NexusConn) respWorker() {
 						"method":        res.Method,
 						"ttl":           res.Ttl,
 						"targetSession": res.Tses,
-						"waitingTime":   round(wT.Sub(cT).Seconds(), 8),
-						"workingTime":   round(time.Since(wT).Seconds(), 8),
-					}).Info("Task completed")
+					})
+
+					if cT, ok := res.CreationTime.(time.Time); ok {
+						if wT, ok := res.WorkingTime.(time.Time); ok {
+							i = i.WithFields(logrus.Fields{
+								"waitingTime": round(wT.Sub(cT).Seconds(), 8),
+								"workingTime": round(time.Since(wT).Seconds(), 8),
+							})
+						} else {
+							i = i.WithFields(logrus.Fields{
+								"waitingTime": round(time.Now().Sub(cT).Seconds(), 8),
+							})
+						}
+					}
+
+					i.Info("Task completed")
 				}
 
 				if res.ErrCode != nil {
