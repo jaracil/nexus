@@ -186,7 +186,9 @@ List the active sessions for an user prefix on the cluster.
     "result": [{"sessions":[{"creationTime":"2016-08-30T12:39:16.39Z","connid":"687c3b7baf4b9471","nodeid":"687c3b7b","protocol":"tcp","remoteAddress":"172.17.0.1:51398"},{"creationTime":"2016-08-30T12:39:21.283Z","id":"687c3b7b407bcce2","nodeid":"687c3b7b","protocol":"tcp","remoteAddress":"172.17.0.1:51402"}],"user":"root","n":2}, ...]
 
 ## sys.session.kick
-Terminates any connection which session id matches the prefix
+Terminates any connection which session id matches the prefix.
+
+> When *sys.session.kick* call returns the session is still not kicked. The action will be completed when the node that owns the session captures and executes the request (this is usually done in milliseconds).
 
 ### Parameters:
 * `"connid": <String>` - Connection ID prefix
@@ -196,6 +198,8 @@ Terminates any connection which session id matches the prefix
 
 ## sys.session.reload
 Reloads user data for any connection which connection id matches the prefix
+
+> When *sys.session.reload* call returns the session is still not reloaded. The action will be completed when the node that owns the session captures and executes the request (this is usually done in milliseconds).
 
 ### Parameters:
 * `"connid": <String>` - Connection ID prefix
