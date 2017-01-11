@@ -1,8 +1,17 @@
 # Versions
+## 1.4.x
+  * Bump version to align numbers with server/clients.
+### New:
+  * `sys.reload` is back to reload a connection's own session without permissions
+
+## 1.2.0
+### New:
+  * `user.getTags`
+  * `user.setDisabled`
 
 ## 1.1.0
+### Modified:
   * `sys.login` also returns the current tags of the user
-
 
 ## 1.0.0
 ### New:
@@ -97,6 +106,7 @@
     * [user.list](#userlist)
     * [user.setTags](#usersettags)
     * [user.delTags](#userdeltags)
+    * [user.getTags](#usergettags)
     * [user.setPass](#usersetpass)
     * [user.addTemplate](#useraddtemplate)
     * [user.delTemplate](#userdeltemplate)
@@ -105,6 +115,7 @@
     * [user.addBlacklist](#useraddblacklist)
     * [user.delBlacklist](#userdelblacklist)
     * [user.setMaxSessions](#usersetmaxsessions)
+    * [user.setDisabled](#usersetdisabled)
 
 # System
 
@@ -435,6 +446,15 @@ Remove a tag from an user on a prefix
 ### Result:
     "result": { "ok": true }
 
+## user.getTags
+Return the list of tags result from merging the user tags with the tags being inherited by the templates
+
+### Parameters:
+* `"user": <String>` - Username of the user to get the tags from
+
+### Result:
+    "result": { "tags": { "test": { "@task.pull": true, "@task.push": true }}}
+
 ## user.setPass
 Set the user password for basic auth
 
@@ -511,6 +531,16 @@ Set the maximum number of parallel sessions active of an user
 ### Parameters:
 * `"user": <String>` - Username of the user
 * `"maxsessions": <Number>` - Number of maximum sessions
+
+### Result:
+    "result": { "ok": true }
+
+## user.setDisabled
+A disabled user cannot login
+
+### Parameters:
+* `"user": <String>` - Username of the user
+* `"disabled": <Bool>` - Enable/Disable the login
 
 ### Result:
     "result": { "ok": true }
