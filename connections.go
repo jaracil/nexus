@@ -135,6 +135,7 @@ func (nc *NexusConn) logRes(res *JsonRpcRes) {
 			"type":   "response",
 			"remote": nc.conn.RemoteAddr().String(),
 			"proto":  nc.proto,
+			"method": res.req.Method,
 		})
 		switch res.req.Method {
 		// Do not log verbose actions
