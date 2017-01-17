@@ -27,9 +27,8 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		}).Warn("Unencrypted connection!!")
 	}
 
-	if headerContains(req.Header["Connection"], "Upgrade") {
+	if headerContains(req.Header["Connection"], "upgrade") {
 		if headerContains(req.Header["Upgrade"], "websocket") {
-
 			// WebSocket
 
 			wsrv := &websocket.Server{}
@@ -49,11 +48,13 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 				} else {
 					nc.proto = "ws"
 				}
+
 				nc.handle()
 			}
 			if wsrv.Header == nil {
 				wsrv.Header = make(map[string][]string)
 			}
+
 			wsrv.Header["Access-Control-Allow-Origin"] = []string{"*"}
 
 			wsrv.ServeHTTP(res, req)
