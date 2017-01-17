@@ -27,7 +27,7 @@ func headerContains(header []string, str string) bool {
 		return false
 	}
 	for _, s := range header {
-		if strings.Contains(s, str) {
+		if strings.Contains(strings.ToLower(s), strings.ToLower(str)) {
 			return true
 		}
 	}
