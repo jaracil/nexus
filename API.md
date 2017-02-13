@@ -283,7 +283,7 @@ Calls a method which will be resolved by the system, and will return a result or
   * `"detach": <Bool>` - The task will eventually be processed but we do not care about the result
   * `"prio": <Number>` - Sets the priority of this task among other pushes on the same method
   * `"ttl": <Number>` - How many times this task can be requeued (by a failed worker/node or a task reject)
-  * `"timeout": <Number>` - How much time should a task be on any state other than "done" before the task is considered failed.
+  * `"timeout": <Number>` - How many seconds should a task be on any state other than "done" before the task is considered failed.
 
 ### Result:
 If "detach" is true, it will immediately receive:
