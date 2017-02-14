@@ -115,20 +115,35 @@ func (nc *NexusConn) handlePipeReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidPipe, "", nil)
 			return
 		}
-		msg := ei.N(req.Params).M("msg").RawZ()
-		res, err := r.Table("pipes").
-			Get(pipeid).
-			Update(map[string]interface{}{"msg": r.Literal(msg), "count": r.Row.Field("count").Add(1), "ismsg": true}).
-			RunWrite(db, r.RunOpts{Durability: "soft"})
-		if err != nil {
-			req.Error(ErrInternal, "", nil)
-			return
-		}
-		if res.Replaced > 0 {
-			req.Result(map[string]interface{}{"ok": true})
+
+		var msgs []interface{}
+		var err error
+		if !ei.N(req.Params).M("multi").BoolZ() {
+			msgs = []interface{}{ei.N(req.Params).M("msg").RawZ()}
 		} else {
-			req.Error(ErrInvalidPipe, "", nil)
+			if msgs, err = ei.N(req.Params).M("msg").Slice(); err != nil {
+				req.Error(ErrInvalidParams, "multi is true. msg should be an array", nil)
+				return
+			}
 		}
+
+		for _, msg := range msgs {
+			res, err := r.Table("pipes").
+				Get(pipeid).
+				Update(map[string]interface{}{"msg": r.Literal(msg), "count": r.Row.Field("count").Add(1), "ismsg": true}).
+				RunWrite(db, r.RunOpts{Durability: "soft"})
+			if err != nil {
+				req.Error(ErrInternal, "", nil)
+				return
+			}
+
+			if res.Replaced <= 0 {
+				req.Error(ErrInvalidPipe, "", nil)
+				return
+			}
+		}
+		req.Result(map[string]interface{}{"ok": true})
+
 	case "pipe.read":
 		pipeid := ei.N(req.Params).M("pipeid").StringZ()
 		if pipeid == "" || !strings.HasPrefix(pipeid, nc.connId) {

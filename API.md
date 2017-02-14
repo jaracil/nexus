@@ -1,4 +1,8 @@
 # Versions
+
+## 1.5.x
+  * `pipe.write` now accepts a `multi` boolean parameter. 
+
 ## 1.4.x
   * Bump version to align numbers with server/clients.
 ### New:
@@ -233,6 +237,7 @@ Writes any JSON object into a pipe.
 ### Parameters:
 * `"pipeid": <String>` - PipeID of the pipe to write to
 * `"msg": <Object>` - Data to write to the pipe
+* `"multi": <Boolean>` - If true, `"msg"` must be an Array, and items will be sent one by one through the pipe.
 
 ### Result:
     "result": { "ok": true }
