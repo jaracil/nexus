@@ -53,14 +53,8 @@ func TestPipeWriteReadClose(t *testing.T) {
 	if _, err = wpipe.Write(2); err != nil {
 		t.Errorf("pipe.write: %s", err.Error())
 	}
-	if _, err = wpipe.Write(3); err != nil {
-		t.Errorf("pipe.write: %s", err.Error())
-	}
-	if _, err = wpipe.Write(4); err != nil {
-		t.Errorf("pipe.write: %s", err.Error())
-	}
-	if _, err = wpipe.Write(5); err != nil {
-		t.Errorf("pipe.write: %s", err.Error())
+	if _, err = wpipe.WriteN([]interface{}{3, 4, 5}); err != nil {
+		t.Errorf("pipe.write, multi: %s", err.Error())
 	}
 	time.Sleep(time.Millisecond * 100)
 	pipeData, err := rpipe.Read(1, time.Second*3)
