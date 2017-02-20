@@ -107,10 +107,10 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 			res.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		if resSlice, _, err := netCliBuf.ReadLine(); err == nil {
+		if resSlice, err := netCliBuf.ReadBytes('\n'); err == nil {
 			res.Header().Set("Content-Type", "application/json")
 			res.WriteHeader(http.StatusOK)
-			res.Write([]byte(resSlice))
+			res.Write(resSlice)
 		} else {
 			res.WriteHeader(http.StatusInternalServerError)
 		}
