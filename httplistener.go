@@ -34,7 +34,7 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 			wsrv := &websocket.Server{}
 			wsrv.Handler = func(ws *websocket.Conn) {
 				if u, err := url.Parse(req.RemoteAddr); err != nil {
-					ws.Config().Origin, _ = url.Parse("0.0.0.0:1234")
+					ws.Config().Origin = &url.URL{Scheme: "http", Host: "0.0.0.0"}
 				} else {
 					ws.Config().Origin = u
 				}
