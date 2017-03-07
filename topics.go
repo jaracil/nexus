@@ -3,8 +3,8 @@ package main
 import (
 	"strings"
 
-	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
+	r "gopkg.in/gorethink/gorethink.v3"
 )
 
 func topicList(s string) (res []interface{}) {

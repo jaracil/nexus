@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
+	r "gopkg.in/gorethink/gorethink.v3"
 )
 
 type Task struct {

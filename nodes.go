@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
 	"github.com/shirou/gopsutil/load"
+	r "gopkg.in/gorethink/gorethink.v3"
 )
 
 var masterNode = int32(0)
@@ -89,7 +89,7 @@ func nodeTrack() {
 				Filter(r.Row.Field("deadline").Lt(r.Now())).
 				Filter(r.Row.Field("kill").Eq(false)).
 				Update(ei.M{"kill": true, "killed_at": r.Now()}, r.UpdateOpts{ReturnChanges: true}).
-				RunWrite(db)
+				RunWrite(db, r.RunOpts{ReadMode: "majority"})
 			if err == nil {
 				for _, ch := range res.Changes {
 					n := ei.N(ch.NewValue)
