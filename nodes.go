@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	r "github.com/dancannon/gorethink"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
 	"github.com/shirou/gopsutil/load"
+	r "gopkg.in/gorethink/gorethink.v3"
 )
 
 var masterNode = int32(0)
@@ -52,6 +52,7 @@ func nodeTrack() {
 	tick := time.NewTicker(time.Second * 3)
 	defer tick.Stop()
 	exit := false
+	last_deadline_update := time.Now()
 	for !exit {
 		select {
 		case <-tick.C:
@@ -78,18 +79,26 @@ func nodeTrack() {
 				exit = true
 				break
 			}
+
 			newNodeData := ei.N(res.Changes[0].NewValue)
+			oldNodeData := ei.N(res.Changes[0].OldValue)
+
 			if newNodeData.M("kill").BoolZ() {
-				Log.Errorf("Ouch!, I've been killed")
+				Log.WithFields(logrus.Fields{
+					"time of last deadline": last_deadline_update,
+					"stored deadline":       oldNodeData.M("deadline").StringZ(),
+				}).Errorf("Ouch!, I've been killed")
 				exit = true
 				break
 			}
+			last_deadline_update = time.Now()
+
 			// Kill expired nodes
 			res, err = r.Table("nodes").
 				Filter(r.Row.Field("deadline").Lt(r.Now())).
 				Filter(r.Row.Field("kill").Eq(false)).
 				Update(ei.M{"kill": true, "killed_at": r.Now()}, r.UpdateOpts{ReturnChanges: true}).
-				RunWrite(db)
+				RunWrite(db, r.RunOpts{ReadMode: "majority"})
 			if err == nil {
 				for _, ch := range res.Changes {
 					n := ei.N(ch.NewValue)

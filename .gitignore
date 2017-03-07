@@ -3,3 +3,4 @@ nexus
 *.key
 scripts/*
 !scripts/*.sh
+vendor/

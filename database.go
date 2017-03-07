@@ -1,11 +1,12 @@
 package main
 
 import (
-	r "github.com/dancannon/gorethink"
-	"github.com/jaracil/ei"
-	. "github.com/jaracil/nexus/log"
 	"strings"
 	"time"
+
+	"github.com/jaracil/ei"
+	. "github.com/jaracil/nexus/log"
+	r "gopkg.in/gorethink/gorethink.v3"
 )
 
 var db *r.Session
