@@ -85,11 +85,21 @@ func nodeTrack() {
 				break
 			}
 			// Kill expired nodes
-			r.Table("nodes").
+			res, err = r.Table("nodes").
 				Filter(r.Row.Field("deadline").Lt(r.Now())).
 				Filter(r.Row.Field("kill").Eq(false)).
-				Update(ei.M{"kill": true}).
+				Update(ei.M{"kill": true, "killed_at": r.Now()}, r.UpdateOpts{ReturnChanges: true}).
 				RunWrite(db)
+			if err == nil {
+				for _, ch := range res.Changes {
+					n := ei.N(ch.NewValue)
+					Log.WithFields(logrus.Fields{
+						"killed":   n.M("id").StringZ(),
+						"now":      n.M("killed_at").TimeZ(),
+						"deadline": n.M("deadline").TimeZ(),
+					}).Printf("Killing node")
+				}
+			}
 			// Clean killed nodes after 10 seconds.
 			cur, err := r.Table("nodes").
 				Filter(r.Row.Field("deadline").Lt(r.Now().Add(-10))).
@@ -103,7 +113,7 @@ func nodeTrack() {
 						id := ei.N(n).M("id").StringZ()
 						cleanNode(id)
 						Log.WithFields(logrus.Fields{
-							"node": id,
+							"cleaned": id,
 						}).Printf("Cleaning node")
 					}
 				}
