@@ -1,4 +1,4 @@
-package: .
+package: github.com/jaracil/nexus
 import:
 - package: github.com/Sirupsen/logrus
   version: ~0.11.4
@@ -6,15 +6,11 @@ import:
 - package: github.com/dancannon/gorethink
   version: ~3.0.1
 - package: github.com/jaracil/ei
-- package: github.com/jaracil/nexus
-  version: ~1.4.3
-  subpackages:
-  - log
 - package: github.com/jaracil/smartio
 - package: github.com/jessevdk/go-flags
   version: ~1.2.0
 - package: github.com/nayarsystems/nxgo
-  version: ~1.4.0
+  version: ~1.5.0
   subpackages:
   - nxcore
 - package: github.com/rifflock/lfshook

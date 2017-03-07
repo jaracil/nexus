@@ -1,5 +1,5 @@
-hash: de6bf65a1a2c8f65d255a98da91a2d0c2790ba1906f720aec1342d25e94c285c
-updated: 2017-03-07T13:29:29.531532972+01:00
+hash: fa70bd93eec1f8e94c7a1af3a1cbc9ec954631a16415c4108420838a1f05bb64
+updated: 2017-03-07T17:15:43.008350151+01:00
 imports:
 - name: cloud.google.com/go
   version: a60f1cde6df9c4cc674baf028d3936ad4df12e54
@@ -76,10 +76,6 @@ imports:
   - testhelper
 - name: github.com/jaracil/ei
   version: 844622be8c2c39592db1d1ec8af5e0733cd9b8f9
-- name: github.com/jaracil/nexus
-  version: 9504953f398eb983704696ed7c066a196db5bf89
-  subpackages:
-  - log
 - name: github.com/jaracil/smartio
   version: a059462b5df8b82bf851e587bb90faca26fe3fab
 - name: github.com/jaracil/websocket
@@ -101,7 +97,7 @@ imports:
 - name: github.com/nayarsystems/kingpin
   version: 8cccfa8eb2e3183254457fb1749b2667fbc364c7
 - name: github.com/nayarsystems/nxgo
-  version: 56055fa9fff44d20cbf40daf06fdc9d2f3dc9f5b
+  version: ef216b4bf8311c4fd848cd74d91369d87530d89f
   subpackages:
   - nxcore
 - name: github.com/olekukonko/tablewriter
