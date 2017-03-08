@@ -89,14 +89,16 @@ func main() {
 		}
 		fd.Close()
 
-		Logger.Hooks.Add(lfshook.NewHook(lfshook.PathMap{
+		logfileFormatter := lfshook.NewHook(lfshook.PathMap{
 			logrus.DebugLevel: opts.Logs.Path,
 			logrus.InfoLevel:  opts.Logs.Path,
 			logrus.WarnLevel:  opts.Logs.Path,
 			logrus.ErrorLevel: opts.Logs.Path,
 			logrus.FatalLevel: opts.Logs.Path,
 			logrus.PanicLevel: opts.Logs.Path,
-		}))
+		})
+		logfileFormatter.SetFormatter(Logger.Formatter)
+		Logger.Hooks.Add(logfileFormatter)
 	}
 
 	signal.Notify(sigChan)
