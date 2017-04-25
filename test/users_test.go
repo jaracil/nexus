@@ -66,15 +66,24 @@ func TestUserSetPass(t *testing.T) {
 	if !IsNexusErrCode(err, nexus.ErrPermissionDenied) {
 		t.Errorf("user.login changed pass: expecting permission denied")
 	}
-	_, err = RootSes.UserSetPass(UserA, UserA)
+	_, err = RootSes.UserSetPass(UserA, "newpass2")
 	if err != nil {
 		t.Errorf("user.setPass: %s", err.Error())
 	}
-	conn, err := login(UserA, UserA)
+	conn, err := login(UserA, "newpass2")
 	if err != nil {
 		t.Errorf("user.login changed pass: %s", err.Error())
 	}
+	_, err = conn.UserSetPass(UserA, UserA)
+	if err != nil {
+		t.Errorf("user.setPass: %s", err.Error())
+	}
 	conn.Close()
+	conn2, err := login(UserA, UserA)
+	if err != nil {
+		t.Errorf("user.login changed pass: %s", err.Error())
+	}
+	conn2.Close()
 }
 
 func TestUserTags(t *testing.T) {

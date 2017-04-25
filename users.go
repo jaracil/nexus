@@ -222,10 +222,19 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			return
 		}
 		tags := nc.getTags(user)
-		if !(ei.N(tags).M("@"+req.Method).BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
-			req.Error(ErrPermissionDenied, "", nil)
-			return
+
+		if !ei.N(tags).M("@admin").BoolZ() {
+			if user == nc.user.User {
+				if e, err := ei.N(tags).M("@" + req.Method).Bool(); err == nil && !e {
+					req.Error(ErrPermissionDenied, "", nil)
+					return
+				}
+			} else if !ei.N(tags).M("@" + req.Method).BoolZ() {
+				req.Error(ErrPermissionDenied, "", nil)
+				return
+			}
 		}
+
 		salt := safeId(16)
 		hp, err := HashPass(pass, salt)
 		if err != nil {
