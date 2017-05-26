@@ -1,5 +1,11 @@
 # Versions
 
+## 1.7.x
+  * `user.getEffectiveTags`
+
+## 1.6.x
+  * `user.setPass` doesn't require any permission when changing the user's own password.
+
 ## 1.5.x
   * `pipe.write` now accepts a `multi` boolean parameter. 
 
@@ -111,6 +117,7 @@
     * [user.setTags](#usersettags)
     * [user.delTags](#userdeltags)
     * [user.getTags](#usergettags)
+    * [user.getEffectiveTags](#usergeteffectivetags)
     * [user.setPass](#usersetpass)
     * [user.addTemplate](#useraddtemplate)
     * [user.delTemplate](#userdeltemplate)
@@ -464,8 +471,18 @@ Return the list of tags result from merging the user tags with the tags being in
 ### Result:
     "result": { "tags": { "test": { "@task.pull": true, "@task.push": true }}}
 
+## user.getEffectiveTags
+Return the list of effective tags for a prefix (result from merging the user tags with the tags being inherited by the templates)
+
+### Parameters:
+* `"user": <String>` - Username of the user to get the tags from
+* `"prefix": <String>` - Prefix to compute and return the user effective tags
+
+### Result:
+    "result": { "tags": { "@task.pull": true, "@task.push": true }}
+
 ## user.setPass
-Set the user password for basic auth
+Set the user password for basic auth (setting user's own password doesn't need any permission)
 
 ### Parameters:
 * `"user": <String>` - Username of the user
