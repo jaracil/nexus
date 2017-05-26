@@ -210,6 +210,32 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 
 		req.Result(ei.M{"tags": ud.Tags})
 
+	case "user.getEffectiveTags":
+		user, err := ei.N(req.Params).M("user").Lower().String()
+		if err != nil {
+			req.Error(ErrInvalidParams, "user", nil)
+			return
+		}
+		prefix, err := ei.N(req.Params).M("prefix").Lower().String()
+		if err != nil {
+			req.Error(ErrInvalidParams, "prefix", nil)
+			return
+		}
+
+		tags := nc.getTags(user)
+		if !(ei.N(tags).M("@"+req.Method).BoolZ() || ei.N(tags).M("@admin").BoolZ() || user == nc.user.User) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+
+		ud, errn := loadUserData(user)
+		if errn != ErrNoError {
+			req.Error(ErrInvalidParams, "", nil)
+			return
+		}
+
+		req.Result(ei.M{"tags": getTags(ud, prefix)})
+
 	case "user.setPass":
 		user, err := ei.N(req.Params).M("user").Lower().String()
 		if err != nil {

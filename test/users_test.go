@@ -1,9 +1,11 @@
 package test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/jaracil/ei"
 	nexus "github.com/nayarsystems/nxgo/nxcore"
 )
 
@@ -92,13 +94,20 @@ func TestUserTags(t *testing.T) {
 		t.Errorf("user.login: %s", err.Error())
 	}
 
-	_, err = RootSes.UserSetTags(UserA, Prefix1, map[string]interface{}{
+	initialTags := map[string]interface{}{
 		"test":   1,
 		"prueba": []string{"vaya", "vaya"},
 		"otra":   map[string]interface{}{"a": 1, "b": 2},
 		"yes":    true,
 		"":       "",
-	})
+	}
+
+	_, err = RootSes.UserSetTags(UserA, Prefix1, initialTags)
+	if err != nil {
+		t.Errorf("user.setTags: %s", err.Error())
+	}
+
+	_, err = RootSes.UserSetTags(UserA, ".", map[string]interface{}{"yes": false})
 	if err != nil {
 		t.Errorf("user.setTags: %s", err.Error())
 	}
@@ -109,6 +118,19 @@ func TestUserTags(t *testing.T) {
 	}
 
 	time.Sleep(time.Second)
+
+	gettedTags, err := sesA.UserGetEffectiveTags(UserA, fmt.Sprintf("%s.yes", Prefix1))
+	if err != nil {
+		t.Errorf("user.getEffectiveTags: %s", err.Error())
+	}
+
+	tag, err := ei.N(gettedTags).M("tags").M("yes").Bool()
+	if err != nil {
+		t.Errorf("user.getEffectiveTags: Missing tag in %#v", gettedTags)
+	}
+	if tag {
+		t.Errorf("user.getEffectiveTags: Tag 'yes' should be false in %#v", gettedTags)
+	}
 
 	_, _, err = sesA.ExecNoWait("task.push", map[string]interface{}{
 		"method": Prefix1 + ".method",

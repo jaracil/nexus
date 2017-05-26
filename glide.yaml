@@ -10,7 +10,7 @@ import:
 - package: github.com/jessevdk/go-flags
   version: ~1.2.0
 - package: github.com/nayarsystems/nxgo
-  version: ~1.5.0
+  version: ~1.7.0
   subpackages:
   - nxcore
 - package: github.com/rifflock/lfshook
