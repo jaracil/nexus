@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -64,6 +65,12 @@ func exit(cause string) {
 
 func main() {
 	parseOptions()
+
+	if opts.Version {
+		fmt.Println(Version.String())
+		os.Exit(0)
+	}
+
 	nodeId = safeId(4)
 
 	if len(opts.Verbose) > 0 {
