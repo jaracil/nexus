@@ -49,8 +49,8 @@ s Building Nexus...
 pushd . &>/dev/null
 cd go/src/github.com/jaracil/nexus/
 
-i go get
-go get -v
+i glide install
+glide install
 if [[ $? != 0 ]]; then
         e Failed
         exit
