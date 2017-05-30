@@ -37,6 +37,7 @@ func nodeTrack() {
 		"kill":     false,
 		"version":  Version.String(),
 	}
+
 	_, err := r.Table("nodes").Insert(ndata).RunWrite(db)
 	if err != nil {
 		Log.WithFields(logrus.Fields{
@@ -57,8 +58,9 @@ func nodeTrack() {
 		select {
 		case <-tick.C:
 			info := ei.M{
-				"deadline": r.Now().Add(10),
-				"clients":  numconn,
+				"deadline":  r.Now().Add(10),
+				"clients":   numconn,
+				"listening": listenContext.Err() == nil,
 			}
 			if l, err := load.Avg(); err == nil {
 				info["load"] = l
@@ -292,7 +294,7 @@ func (nc *NexusConn) handleNodesReq(req *JsonRpcReq) {
 			return
 		}
 
-		term := r.Table("nodes").Pluck("id", "clients", "load", "version")
+		term := r.Table("nodes").Pluck("id", "clients", "load", "version", "listening")
 
 		if skip >= 0 {
 			term = term.Skip(skip)
