@@ -138,7 +138,10 @@ func httpListener(u *url.URL, ctx context.Context) {
 	}).Println("New HTTP listener started")
 
 	err := server.ListenAndServe()
-	if err != nil && ctx.Err() == nil {
+	if ctx.Err() != nil {
+		return
+	}
+	if err != nil {
 		Log.WithFields(logrus.Fields{
 			"error": err.Error(),
 		}).Errorln("HTTP listener error")
@@ -169,7 +172,11 @@ func httpsListener(u *url.URL, ctx context.Context) {
 	}).Println("New HTTPS listener started")
 
 	err := server.ListenAndServeTLS(opts.SSL.Cert, opts.SSL.Key)
-	if err != nil && ctx.Err() == nil {
+	if ctx.Err() != nil {
+		return
+	}
+
+	if err != nil {
 		Log.WithFields(logrus.Fields{
 			"error": err.Error(),
 		}).Error("HTTPS listener error")
@@ -202,7 +209,10 @@ func healthCheckListener(u *url.URL, ctx context.Context) {
 	}).Println("New health listener started")
 
 	err := server.ListenAndServe()
-	if err != nil && ctx.Err() == nil {
+	if ctx.Err() != nil {
+		return
+	}
+	if err != nil {
 		Log.WithFields(logrus.Fields{
 			"error": err.Error(),
 		}).Errorln("HealthCheck listener error")

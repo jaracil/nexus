@@ -122,7 +122,10 @@ func sslListener(u *url.URL, ctx context.Context, proxyed bool) {
 		listen = tls.NewListener(proxyListen, tlsConfig)
 	} else {
 		listen, err = tls.Listen("tcp", u.Host, tlsConfig)
-		if err != nil && ctx.Err() == nil {
+		if ctx.Err() != nil {
+			return
+		}
+		if err != nil {
 			Log.WithFields(logrus.Fields{
 				"error": err,
 			}).Errorln("Cannot open sslListener")
