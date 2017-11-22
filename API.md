@@ -1,5 +1,8 @@
 # Versions
 
+## 1.8.x
+  * `user.list` return value elements include a new field `createdAt` with a timestamp of user creation
+
 ## 1.7.x
   * `user.getEffectiveTags`
 
