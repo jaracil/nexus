@@ -2,6 +2,7 @@ package main
 
 import (
 	"strings"
+	"time"
 
 	"github.com/jaracil/ei"
 	r "gopkg.in/gorethink/gorethink.v3"
@@ -13,6 +14,7 @@ type UserData struct {
 	Salt      string                            `gorethink:"salt,omitempty"`
 	Tags      map[string]map[string]interface{} `gorethink:"tags,omitempty"`
 	Templates []string                          `gorethink:"templates,omitempty"`
+	CreatedAt time.Time                         `gorethink:"createdAt,omitempty"`
 
 	// Limits
 	Mask        map[string]map[string]interface{} `gorethink:"mask,omitempty"`
@@ -44,7 +46,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		ud := UserData{User: user, Salt: safeId(16), Tags: map[string]map[string]interface{}{}, Templates: []string{}, MaxSessions: DEFAULT_MAX_SESSIONS, Disabled: false}
+		ud := UserData{User: user, Salt: safeId(16), Tags: map[string]map[string]interface{}{}, Templates: []string{}, MaxSessions: DEFAULT_MAX_SESSIONS, Disabled: false, CreatedAt: time.Now()}
 		ud.Pass, err = HashPass(pass, ud.Salt)
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
@@ -302,7 +304,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		}
 		term := r.Table("users").
 			Between(prefix, prefix+"\uffff").
-			Pluck("id", "tags", "templates", "whitelist", "blacklist", "maxsessions", "disabled")
+			Pluck("id", "tags", "templates", "whitelist", "blacklist", "maxsessions", "disabled", "createdAt")
 
 		if skip >= 0 {
 			term = term.Skip(skip)
@@ -321,6 +323,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 				"blacklist":   row.Field("blacklist").Default(ei.S{}),
 				"maxsessions": row.Field("maxsessions").Default(DEFAULT_MAX_SESSIONS),
 				"disabled":    row.Field("disabled").Default(false),
+				"createdAt":   row.Field("createdAt").Default(time.Time{}),
 			}
 		}).Run(db)
 		if err != nil {
