@@ -510,7 +510,8 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		term := r.Table("tasks")
+		term := r.Table("tasks").
+			Between([]interface{}{prefix, r.MinVal, r.MinVal}, []interface{}{prefix + "\uffff", r.MaxVal, r.MaxVal}, r.BetweenOpts{Index: "pspc"})
 
 		if skip >= 0 {
 			term = term.Skip(skip)
