@@ -288,31 +288,16 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		req.Result(map[string]interface{}{"ok": true})
 
 	case "user.list":
-		prefix := ei.N(req.Params).M("prefix").Lower().StringZ()
-		limit, err := ei.N(req.Params).M("limit").Int()
-		if err != nil {
-			limit = 100
-		}
-		skip, err := ei.N(req.Params).M("skip").Int()
-		if err != nil {
-			skip = 0
-		}
+		prefix, depth, filter, limit, skip := getListParams(req.Params)
+
 		tags := nc.getTags(prefix)
 		if !(ei.N(tags).M("@user.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		term := r.Table("users").
-			Between(prefix, prefix+"\uffff").
+
+		term := getListTerm("users", "", "id", prefix, depth, filter, limit, skip).
 			Pluck("id", "tags", "templates", "whitelist", "blacklist", "maxsessions", "disabled", "createdAt")
-
-		if skip >= 0 {
-			term = term.Skip(skip)
-		}
-
-		if limit > 0 {
-			term = term.Limit(limit)
-		}
 
 		cur, err := term.Map(func(row r.Term) interface{} {
 			return ei.M{
@@ -331,7 +316,10 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			return
 		}
 		var all []interface{}
-		cur.All(&all)
+		if err := cur.All(&all); err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
 		req.Result(all)
 
 	case "user.addTemplate":

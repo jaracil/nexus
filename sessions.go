@@ -59,22 +59,17 @@ func sessionTrack() {
 func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 	switch req.Method {
 	case "sys.session.list":
-		prefix := ei.N(req.Params).M("prefix").Lower().StringZ()
-		limit, err := ei.N(req.Params).M("limit").Int()
-		if err != nil {
-			limit = 100
-		}
-		skip, err := ei.N(req.Params).M("skip").Int()
-		if err != nil {
-			skip = 0
-		}
+		prefix, depth, filter, limit, skip := getListParams(req.Params)
+
 		tags := nc.getTags(prefix)
 		if !(ei.N(tags).M("@sys.session.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		term := r.Table("sessions").
-			Between(prefix, prefix+"\uffff", r.BetweenOpts{Index: "users"}).
+
+		term := getListTerm("sessions", "users", "user", prefix, depth, filter, limit, skip)
+
+		term = term.
 			Map(func(row r.Term) interface{} {
 				return ei.M{"user": row.Field("user"),
 					"connid":        row.Field("id"),
@@ -86,14 +81,6 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 			Group("user").
 			Pluck("connid", "nodeid", "remoteAddress", "creationTime", "protocol").
 			Filter(r.Row.Field("protocol").Ne("internal"))
-
-		if skip >= 0 {
-			term = term.Skip(skip)
-		}
-
-		if limit > 0 {
-			term = term.Limit(limit)
-		}
 
 		cur, err := term.Ungroup().
 			Map(func(row r.Term) interface{} {

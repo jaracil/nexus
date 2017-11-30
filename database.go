@@ -152,6 +152,15 @@ func dbBootstrap() error {
 	if err != nil {
 		return err
 	}
+	if !inStrSlice(tasksIndexlist, "path") {
+		Log.Println("Creating path index on tasks table")
+		_, err := r.Table("tasks").IndexCreateFunc("path", func(row r.Term) interface{} {
+			return row.Field("path")
+		}).RunWrite(db)
+		if err != nil {
+			return err
+		}
+	}
 	if !inStrSlice(tasksIndexlist, "pspc") {
 		Log.Println("Creating pspc index on tasks table")
 		_, err := r.Table("tasks").IndexCreateFunc("pspc", func(row r.Term) interface{} {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -492,31 +493,39 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		}
 
 	case "task.list":
-		prefix, err := ei.N(req.Params).M("prefix").Lower().String()
-		if err != nil {
-			req.Error(ErrInvalidParams, "prefix", nil)
-			return
-		}
-		limit, err := ei.N(req.Params).M("limit").Int()
-		if err != nil {
-			limit = 100
-		}
-		skip, err := ei.N(req.Params).M("skip").Int()
-		if err != nil {
-			skip = 0
-		}
+		prefix, depth, filter, limit, skip := getListParams(req.Params)
+
 		tags := nc.getTags(prefix)
 		if !(ei.N(tags).M("@task.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		term := r.Table("tasks").
-			Between([]interface{}{prefix, r.MinVal, r.MinVal}, []interface{}{prefix + "\uffff", r.MaxVal, r.MaxVal}, r.BetweenOpts{Index: "pspc"})
 
+		var term r.Term
+		if prefix == "" {
+			if depth < 0 {
+				term = r.Table("tasks")
+			} else if depth == 0 {
+				term = r.Table("tasks").GetAllByIndex("path", ".")
+			} else {
+				term = r.Table("tasks").Filter(r.Row.Field("path").Match(fmt.Sprintf("^([^.]*[.]){0,%d}$", depth)))
+			}
+		} else {
+			if depth != 0 {
+				term = r.Table("tasks").Between(prefix+".", prefix+".\uffff", r.BetweenOpts{Index: "path"})
+			} else {
+				term = r.Table("tasks").GetAllByIndex("path", prefix+".")
+			}
+			if depth > 0 {
+				term = term.Filter(r.Row.Field("path").Match(fmt.Sprintf("^%s([.][^.]*){0,%d}[.]$", prefix, depth)))
+			}
+		}
+		if filter != "" {
+			term = term.Filter(r.Row.Field("path").Match(filter))
+		}
 		if skip >= 0 {
 			term = term.Skip(skip)
 		}
-
 		if limit > 0 {
 			term = term.Limit(limit)
 		}
@@ -527,7 +536,10 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			return
 		}
 		ret := make([]*Task, 0)
-		cur.All(&ret)
+		if err := cur.All(&ret); err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
 
 		for _, task := range ret {
 			task.Path = strings.TrimPrefix(task.Path, "@pull.")
@@ -536,6 +548,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		}
 
 		req.Result(ret)
+
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
 	}

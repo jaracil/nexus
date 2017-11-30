@@ -60,6 +60,31 @@ func (nc *NexusConn) handleSyncReq(req *JsonRpcReq) {
 			return
 		}
 		req.Result(ei.M{"ok": true})
+
+	case "sync.list":
+		prefix, depth, filter, limit, skip := getListParams(req.Params)
+
+		tags := nc.getTags(prefix)
+		if !(ei.N(tags).M("@sync.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+
+		term := getListTerm("locks", "", "id", prefix, depth, filter, limit, skip).
+			Pluck("id", "owner")
+
+		cur, err := term.Run(db)
+		if err != nil {
+			req.Error(ErrInternal, err.Error(), nil)
+			return
+		}
+		var all []interface{}
+		if err := cur.All(&all); err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+		req.Result(all)
+
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
 	}
