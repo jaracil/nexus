@@ -65,8 +65,12 @@ func getPathMethod(s string) (path, method string) {
 	return
 }
 
+func getPrefixParam(reqParams interface{}) string {
+	return strings.TrimRight(ei.N(reqParams).M("prefix").Lower().StringZ(), ".")
+}
+
 func getListParams(reqParams interface{}) (string, int, string, int, int) {
-	prefix := strings.TrimRight(ei.N(reqParams).M("prefix").Lower().StringZ(), ".")
+	prefix := getPrefixParam(reqParams)
 	depth, err := ei.N(reqParams).M("depth").Int()
 	if err != nil {
 		depth = -1
@@ -83,6 +87,49 @@ func getListParams(reqParams interface{}) (string, int, string, int, int) {
 	return prefix, depth, filter, limit, skip
 }
 
+func getCountTerm(table string, index string, filterBy string, prefix string, filter string, subprefixes bool) r.Term {
+	var term r.Term
+	if subprefixes {
+		if prefix == "" {
+			term = r.Table(table)
+			if filter != "" {
+				term = term.Filter(r.Row.Field(filterBy).Match(filter))
+			}
+			term = term.Group(r.Row.Field(filterBy).Match("^([^.]*)(?:[.][^.]*)*$").Field("groups").Nth(0).Field("str"))
+			return term.Count().Ungroup().Map(func(t r.Term) r.Term {
+				return r.Branch(t.HasFields("group"), r.Object("prefix", t.Field("group"), "count", t.Field("reduction")), r.Object("prefix", "", "count", t.Field("reduction")))
+			})
+		} else {
+			if index != "" {
+				term = r.Table(table).GetAllByIndex(index, prefix).Union(r.Table(table).Between(prefix+".", prefix+".\uffff", r.BetweenOpts{Index: index}))
+			} else {
+				term = r.Table(table).GetAll(prefix).Union(r.Table(table).Between(prefix+".", prefix+".\uffff"))
+			}
+			if filter != "" {
+				term = term.Filter(r.Row.Field(filterBy).Match(filter))
+			}
+			term = term.Group(r.Row.Field(filterBy).Match(fmt.Sprintf("^%s[.]([^.]*)(?:[.][^.]*)*$", prefix)).Field("groups").Nth(0).Field("str"))
+			return term.Count().Ungroup().Map(func(t r.Term) r.Term {
+				return r.Branch(t.HasFields("group"), r.Object("prefix", r.Add(prefix+".", t.Field("group")), "count", t.Field("reduction")), r.Object("prefix", prefix, "count", t.Field("reduction")))
+			})
+		}
+	} else {
+		if prefix == "" {
+			term = r.Table(table)
+		} else {
+			if index != "" {
+				term = r.Table(table).GetAllByIndex(index, prefix).Union(r.Table(table).Between(prefix+".", prefix+".\uffff", r.BetweenOpts{Index: index}))
+			} else {
+				term = r.Table(table).GetAll(prefix).Union(r.Table(table).Between(prefix+".", prefix+".\uffff"))
+			}
+		}
+		if filter != "" {
+			term = term.Filter(r.Row.Field(filterBy).Match(filter))
+		}
+		return term.Count()
+	}
+}
+
 func getListTerm(table string, index string, filterBy string, prefix string, depth int, filter string, limit int, skip int) r.Term {
 	var term r.Term
 	if prefix == "" {
@@ -97,7 +144,7 @@ func getListTerm(table string, index string, filterBy string, prefix string, dep
 		} else if depth == 1 {
 			term = r.Table(table).Filter(r.Row.Field(filterBy).Match("^[^.]*$"))
 		} else {
-			term = r.Table(table).Filter(r.Row.Field(filterBy).Match(fmt.Sprintf("^[^.]*([.][^.]*){0,%d}$", depth-1)))
+			term = r.Table(table).Filter(r.Row.Field(filterBy).Match(fmt.Sprintf("^[^.]*(?:[.][^.]*){0,%d}$", depth-1)))
 		}
 	} else {
 		if index != "" {
@@ -113,7 +160,7 @@ func getListTerm(table string, index string, filterBy string, prefix string, dep
 			}
 		}
 		if depth > 0 {
-			term = term.Filter(r.Row.Field(filterBy).Match(fmt.Sprintf("^%s([.][^.]*){0,%d}$", prefix, depth)))
+			term = term.Filter(r.Row.Field(filterBy).Match(fmt.Sprintf("^%s(?:[.][^.]*){0,%d}$", prefix, depth)))
 		}
 	}
 	if filter != "" {

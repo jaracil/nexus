@@ -322,6 +322,36 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		}
 		req.Result(all)
 
+	case "user.count":
+		prefix := getPrefixParam(req.Params)
+		filter := ei.N(req.Params).M("filter").StringZ()
+		countSubprefixes := ei.N(req.Params).M("subprefixes").BoolZ()
+
+		tags := nc.getTags(prefix)
+		if !(ei.N(tags).M("@user.count").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+
+		term := getCountTerm("users", "", "id", prefix, filter, countSubprefixes)
+		cur, err := term.Run(db)
+		if err != nil {
+			req.Error(ErrInternal, err.Error(), nil)
+			return
+		}
+		var all []interface{}
+		if err := cur.All(&all); err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+		if countSubprefixes {
+			req.Result(all)
+		} else if len(all) > 0 {
+			req.Result(ei.M{"count": all[0]})
+		} else {
+			req.Result(ei.M{"count": 0})
+		}
+
 	case "user.addTemplate":
 		param, err := ei.N(req.Params).M("template").String()
 		if err != nil {

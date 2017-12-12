@@ -506,18 +506,18 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			if depth < 0 {
 				term = r.Table("tasks")
 			} else if depth == 0 {
-				term = r.Table("tasks").GetAllByIndex("path", ".")
+				term = r.Table("tasks").GetAllByIndex("path", ".", "@pull.")
 			} else {
-				term = r.Table("tasks").Filter(r.Row.Field("path").Match(fmt.Sprintf("^([^.]*[.]){0,%d}$", depth)))
+				term = r.Table("tasks").Filter(r.Row.Field("path").Match(fmt.Sprintf("^(?:@pull[.])??(?:[^.]*[.]){0,%d}$", depth)))
 			}
 		} else {
 			if depth != 0 {
-				term = r.Table("tasks").Between(prefix+".", prefix+".\uffff", r.BetweenOpts{Index: "path"})
+				term = r.Table("tasks").Between(prefix+".", prefix+".\uffff", r.BetweenOpts{Index: "path"}).Union(r.Table("tasks").Between("@pull."+prefix+".", "@pull."+prefix+".\uffff", r.BetweenOpts{Index: "path"}))
 			} else {
-				term = r.Table("tasks").GetAllByIndex("path", prefix+".")
+				term = r.Table("tasks").GetAllByIndex("path", prefix+".", "@pull."+prefix+".")
 			}
 			if depth > 0 {
-				term = term.Filter(r.Row.Field("path").Match(fmt.Sprintf("^%s([.][^.]*){0,%d}[.]$", prefix, depth)))
+				term = term.Filter(r.Row.Field("path").Match(fmt.Sprintf("^%s(?:[.][^.]*){0,%d}[.]$", prefix, depth)))
 			}
 		}
 		if filter != "" {
@@ -548,6 +548,66 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		}
 
 		req.Result(ret)
+
+	case "task.count":
+		prefix := getPrefixParam(req.Params)
+		filter := ei.N(req.Params).M("filter").StringZ()
+		countSubprefixes := ei.N(req.Params).M("subprefixes").BoolZ()
+
+		tags := nc.getTags(prefix)
+		if !(ei.N(tags).M("@task.count").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+
+		var term r.Term
+		if countSubprefixes {
+			if prefix == "" {
+				term = r.Table("tasks")
+				if filter != "" {
+					term = term.Filter(r.Row.Field("path").Match(filter))
+				}
+				term = term.Group(r.Row.Field("path").Match("^(?:@pull[.])??([^.]*)[.](?:[^.]*[.])*$").Field("groups").Nth(0).Field("str")).Count().Ungroup().Map(func(t r.Term) r.Term {
+					return r.Branch(t.HasFields("group"), r.Object("prefix", t.Field("group"), "count", t.Field("reduction")), r.Object("prefix", "", "count", t.Field("reduction")))
+				})
+			} else {
+				term = r.Table("tasks").Between(prefix+".", prefix+".\uffff", r.BetweenOpts{Index: "path"}).Union(r.Table("tasks").Between("@pull."+prefix+".", "@pull."+prefix+".\uffff", r.BetweenOpts{Index: "path"}))
+				if filter != "" {
+					term = term.Filter(r.Row.Field("path").Match(filter))
+				}
+				term = term.Group(r.Row.Field("path").Match(fmt.Sprintf("^(?:@pull[.])??%s[.]([^.]*)[.](?:[^.]*[.])*$", prefix)).Field("groups").Nth(0).Field("str")).Count().Ungroup().Map(func(t r.Term) r.Term {
+					return r.Branch(t.HasFields("group"), r.Object("prefix", r.Add(prefix+".", t.Field("group")), "count", t.Field("reduction")), r.Object("prefix", prefix, "count", t.Field("reduction")))
+				})
+			}
+		} else {
+			if prefix == "" {
+				term = r.Table("tasks")
+			} else {
+				term = r.Table("tasks").Between(prefix+".", prefix+".\uffff", r.BetweenOpts{Index: "path"}).Union(r.Table("tasks").Between("@pull."+prefix+".", "@pull."+prefix+".\uffff", r.BetweenOpts{Index: "path"}))
+			}
+			if filter != "" {
+				term = term.Filter(r.Row.Field("path").Match(filter))
+			}
+			term = term.Count()
+		}
+
+		cur, err := term.Run(db)
+		if err != nil {
+			req.Error(ErrInternal, err.Error(), nil)
+			return
+		}
+		var all []interface{}
+		if err := cur.All(&all); err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+		if countSubprefixes {
+			req.Result(all)
+		} else if len(all) > 0 {
+			req.Result(ei.M{"count": all[0]})
+		} else {
+			req.Result(ei.M{"count": 0})
+		}
 
 	default:
 		req.Error(ErrMethodNotFound, "", nil)

@@ -128,7 +128,7 @@ func (nc *NexusConn) handleTopicReq(req *JsonRpcReq) {
 		prefix, depth, filter, limit, skip := getListParams(req.Params)
 
 		tags := nc.getTags(prefix)
-		if !(ei.N(tags).M("@sync.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
+		if !(ei.N(tags).M("@topic.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
@@ -149,13 +149,13 @@ func (nc *NexusConn) handleTopicReq(req *JsonRpcReq) {
 						} else if depth == 1 {
 							filtTerm = t.Match("^[^.]*$")
 						} else {
-							filtTerm = t.Match(fmt.Sprintf("^[^.]*([.][^.]*){0,%d}$", depth-1))
+							filtTerm = t.Match(fmt.Sprintf("^[^.]*(?:[.][^.]*){0,%d}$", depth-1))
 						}
 					} else {
 						if depth < 0 {
-							filtTerm = t.Match(fmt.Sprintf("^%s([.][^.]*)*$", prefix))
+							filtTerm = t.Match(fmt.Sprintf("^%s(?:[.][^.]*)*$", prefix))
 						} else {
-							filtTerm = t.Match(fmt.Sprintf("^%s([.][^.]*){0,%d}$", prefix, depth))
+							filtTerm = t.Match(fmt.Sprintf("^%s(?:[.][^.]*){0,%d}$", prefix, depth))
 						}
 					}
 					if filter != "" {
@@ -187,6 +187,74 @@ func (nc *NexusConn) handleTopicReq(req *JsonRpcReq) {
 			return
 		}
 		req.Result(all)
+
+	case "topic.count":
+		prefix := getPrefixParam(req.Params)
+		filter := ei.N(req.Params).M("filter").StringZ()
+		countSubprefixes := ei.N(req.Params).M("subprefixes").BoolZ()
+
+		tags := nc.getTags(prefix)
+		if !(ei.N(tags).M("@topic.count").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+
+		term := r.Table("pipes").Between(prefix, prefix+"\uffff", r.BetweenOpts{Index: "subs"}).
+			Distinct(r.DistinctOpts{Index: "id"}).Distinct().
+			EqJoin(func(t r.Term) r.Term { return t }, r.Table("pipes")).Field("right").Field("subs")
+
+		if prefix != "" || filter != "" {
+			term = term.Map(func(t r.Term) r.Term {
+				return t.Filter(func(t r.Term) r.Term {
+					var filtTerm r.Term
+					if prefix == "" {
+						return t.Match(filter)
+					} else {
+						filtTerm = t.Match(fmt.Sprintf("^%s(?:[.][^.]*)*$", prefix))
+					}
+					if filter != "" {
+						filtTerm = filtTerm.And(t.Match(filter))
+					}
+					return filtTerm
+				})
+			})
+		}
+
+		term = term.Reduce(func(left r.Term, right r.Term) r.Term { return left.Add(right) }).Default([]interface{}{})
+
+		if countSubprefixes {
+			if prefix == "" {
+				term = term.Group(func(t r.Term) r.Term { return t.Match("^([^.]*)(?:[.][^.]*)*$").Field("groups").Nth(0).Field("str") }).Count().Ungroup().Map(func(t r.Term) r.Term {
+					return r.Branch(t.HasFields("group"), r.Object("prefix", t.Field("group"), "count", t.Field("reduction")), r.Object("prefix", "", "count", t.Field("reduction")))
+				})
+			} else {
+				term = term.Group(func(t r.Term) r.Term {
+					return t.Match(fmt.Sprintf("^%s[.]([^.]*)(?:[.][^.]*)*$", prefix)).Field("groups").Nth(0).Field("str")
+				}).Count().Ungroup().Map(func(t r.Term) r.Term {
+					return r.Branch(t.HasFields("group"), r.Object("prefix", r.Add(prefix+".", t.Field("group")), "count", t.Field("reduction")), r.Object("prefix", prefix, "count", t.Field("reduction")))
+				})
+			}
+		} else {
+			term = term.Count()
+		}
+
+		cur, err := term.Run(db)
+		if err != nil {
+			req.Error(ErrInternal, err.Error(), nil)
+			return
+		}
+		var all []interface{}
+		if err := cur.All(&all); err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+		if countSubprefixes {
+			req.Result(all)
+		} else if len(all) > 0 {
+			req.Result(ei.M{"count": all[0]})
+		} else {
+			req.Result(ei.M{"count": 0})
+		}
 
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
