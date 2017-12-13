@@ -282,7 +282,7 @@ func taskExpireTtl(taskid string) {
 func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 	switch req.Method {
 	case "task.push":
-		method, err := ei.N(req.Params).M("method").Lower().String()
+		method, err := ei.N(req.Params).M("method").Lower().F(checkRegexp, _taskRegexp).F(checkNotEmptyLabels).String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "method", nil)
 			return
@@ -357,7 +357,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		if req.Id == nil {
 			return
 		}
-		prefix := ei.N(req.Params).M("prefix").Lower().StringZ()
+		prefix := ei.N(req.Params).M("prefix").Lower().F(checkRegexp, _taskRegexp).F(checkNotEmptyLabels).StringZ()
 		if prefix == "" {
 			req.Error(ErrInvalidParams, "prefix", nil)
 			return

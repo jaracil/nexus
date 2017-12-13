@@ -31,7 +31,7 @@ const DEFAULT_MAX_SESSIONS = 50
 func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 	switch req.Method {
 	case "user.create":
-		user, err := ei.N(req.Params).M("user").Lower().F(checkRegexp, _userRegexp).F(checkLen, _userMinLen, _userMaxLen).String()
+		user, err := ei.N(req.Params).M("user").Lower().F(checkRegexp, _prefixRegexp).F(checkNotEmptyLabels).F(checkLen, _userMinLen, _userMaxLen).String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "user", nil)
 			return

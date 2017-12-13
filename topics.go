@@ -38,7 +38,7 @@ func (nc *NexusConn) handleTopicReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidParams, "pipeid", nil)
 			return
 		}
-		topic, err := ei.N(req.Params).M("topic").Lower().String()
+		topic, err := ei.N(req.Params).M("topic").Lower().F(checkRegexp, _prefixRegexp).F(checkNotEmptyLabels).String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "topic", nil)
 			return
@@ -71,7 +71,7 @@ func (nc *NexusConn) handleTopicReq(req *JsonRpcReq) {
 			req.Error(ErrInvalidParams, "pipeid", nil)
 			return
 		}
-		topic, err := ei.N(req.Params).M("topic").Lower().String()
+		topic, err := ei.N(req.Params).M("topic").Lower().F(checkRegexp, _prefixRegexp).F(checkNotEmptyLabels).String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "topic", nil)
 			return
@@ -100,7 +100,7 @@ func (nc *NexusConn) handleTopicReq(req *JsonRpcReq) {
 		req.Result(map[string]interface{}{"ok": true})
 
 	case "topic.pub":
-		topic, err := ei.N(req.Params).M("topic").Lower().String()
+		topic, err := ei.N(req.Params).M("topic").Lower().F(checkRegexp, _prefixRegexp).F(checkNotEmptyLabels).String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "topic", nil)
 			return

@@ -8,7 +8,7 @@ import (
 func (nc *NexusConn) handleSyncReq(req *JsonRpcReq) {
 	switch req.Method {
 	case "sync.lock":
-		lock, err := ei.N(req.Params).M("lock").String()
+		lock, err := ei.N(req.Params).M("lock").Lower().F(checkRegexp, _prefixRegexp).F(checkNotEmptyLabels).String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "lock", nil)
 			return
@@ -35,7 +35,7 @@ func (nc *NexusConn) handleSyncReq(req *JsonRpcReq) {
 		}
 		req.Result(ei.M{"ok": true})
 	case "sync.unlock":
-		lock, err := ei.N(req.Params).M("lock").String()
+		lock, err := ei.N(req.Params).M("lock").Lower().F(checkRegexp, _prefixRegexp).F(checkNotEmptyLabels).String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "lock", nil)
 			return
