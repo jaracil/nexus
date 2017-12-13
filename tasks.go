@@ -567,7 +567,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 				if filter != "" {
 					term = term.Filter(r.Row.Field("path").Match(filter))
 				}
-				term = term.Group(r.Row.Field("path").Match("^(?:@pull[.])??([^.]*)[.](?:[^.]*[.])*$").Field("groups").Nth(0).Field("str")).Count().Ungroup().Map(func(t r.Term) r.Term {
+				term = term.Group(r.Row.Field("path").Match("^((?:@pull[.])??[^.]*)[.](?:[^.]*[.])*$").Field("groups").Nth(0).Field("str")).Count().Ungroup().Map(func(t r.Term) r.Term {
 					return r.Branch(t.HasFields("group"), r.Object("prefix", t.Field("group"), "count", t.Field("reduction")), r.Object("prefix", "", "count", t.Field("reduction")))
 				})
 			} else {
@@ -575,10 +575,40 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 				if filter != "" {
 					term = term.Filter(r.Row.Field("path").Match(filter))
 				}
-				term = term.Group(r.Row.Field("path").Match(fmt.Sprintf("^(?:@pull[.])??%s[.]([^.]*)[.](?:[^.]*[.])*$", prefix)).Field("groups").Nth(0).Field("str")).Count().Ungroup().Map(func(t r.Term) r.Term {
-					return r.Branch(t.HasFields("group"), r.Object("prefix", r.Add(prefix+".", t.Field("group")), "count", t.Field("reduction")), r.Object("prefix", prefix, "count", t.Field("reduction")))
+				term = term.Group(r.Row.Field("path").Match(fmt.Sprintf("^((?:@pull[.])??%s[.][^.]*)[.](?:[^.]*[.])*$", prefix)).Field("groups").Nth(0).Field("str")).Count().Ungroup().Map(func(t r.Term) r.Term {
+					return r.Branch(t.HasFields("group"), r.Object("prefix", t.Field("group"), "count", t.Field("reduction")), r.Object("prefix", prefix, "count", t.Field("reduction")))
 				})
 			}
+			cur, err := term.Run(db)
+			if err != nil {
+				req.Error(ErrInternal, err.Error(), nil)
+				return
+			}
+			var all []interface{}
+			if err := cur.All(&all); err != nil {
+				req.Error(ErrInternal, "", nil)
+				return
+			}
+
+			res := []interface{}{}
+			countPulls := map[string]int{}
+			for _, v := range all {
+				p := ei.N(v).M("prefix").StringZ()
+				if strings.HasPrefix(p, "@pull.") {
+					p = strings.SplitAfterN(p, ".", 2)[1]
+					countPulls[p] = ei.N(v).M("count").IntZ()
+				}
+			}
+			for _, v := range all {
+				p := ei.N(v).M("prefix").StringZ()
+				if !strings.HasPrefix(p, "@pull.") {
+					pullCount := countPulls[p]
+					pushCount := ei.N(v).M("count").IntZ()
+					res = append(res, ei.M{"prefix": p, "count": pushCount + pullCount, "pullCount": pullCount, "pushCount": pushCount})
+				}
+			}
+			req.Result(res)
+
 		} else {
 			if prefix == "" {
 				term = r.Table("tasks")
@@ -589,24 +619,45 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 				term = term.Filter(r.Row.Field("path").Match(filter))
 			}
 			term = term.Count()
-		}
 
-		cur, err := term.Run(db)
-		if err != nil {
-			req.Error(ErrInternal, err.Error(), nil)
-			return
-		}
-		var all []interface{}
-		if err := cur.All(&all); err != nil {
-			req.Error(ErrInternal, "", nil)
-			return
-		}
-		if countSubprefixes {
-			req.Result(all)
-		} else if len(all) > 0 {
-			req.Result(ei.M{"count": all[0]})
-		} else {
-			req.Result(ei.M{"count": 0})
+			cur, err := term.Run(db)
+			if err != nil {
+				req.Error(ErrInternal, err.Error(), nil)
+				return
+			}
+			var count int
+			if err := cur.One(&count); err != nil {
+				req.Error(ErrInternal, "", nil)
+				return
+			}
+
+			if prefix == "" {
+				term = r.Table("tasks").Between("@pull.", "@pull.\uffff", r.BetweenOpts{Index: "path"})
+			} else {
+				term = r.Table("tasks").Between("@pull."+prefix+".", "@pull."+prefix+".\uffff", r.BetweenOpts{Index: "path"})
+			}
+			if filter != "" {
+				term = term.Filter(r.Row.Field("path").Match(filter))
+			}
+			term = term.Count()
+
+			cur, err = term.Run(db)
+			if err != nil {
+				req.Error(ErrInternal, err.Error(), nil)
+				return
+			}
+			var countPulls int
+			if err := cur.One(&countPulls); err != nil {
+				req.Error(ErrInternal, "", nil)
+				return
+			}
+
+			countPushes := count - countPulls
+			if countPushes < 0 {
+				countPushes = 0
+			}
+
+			req.Result(ei.M{"count": count, "pullCount": countPulls, "pushCount": countPushes})
 		}
 
 	default:
