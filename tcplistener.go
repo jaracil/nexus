@@ -5,10 +5,11 @@ import (
 	"net"
 	"net/url"
 
-	"github.com/sirupsen/logrus"
+	"context"
+
 	"github.com/armon/go-proxyproto"
 	. "github.com/jaracil/nexus/log"
-	"golang.org/x/net/context"
+	"github.com/sirupsen/logrus"
 )
 
 func tcpListener(u *url.URL, ctx context.Context, proxyed bool) {

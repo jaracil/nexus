@@ -10,12 +10,13 @@ import (
 	"time"
 	"unsafe"
 
+	"context"
+
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
 	"github.com/jaracil/smartio"
 	"github.com/nayarsystems/nxgo/nxcore"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 	r "gopkg.in/gorethink/gorethink.v3"
 )
 

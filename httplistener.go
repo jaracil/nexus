@@ -13,7 +13,7 @@ import (
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
 	"github.com/tylerb/graceful"
-	"golang.org/x/net/context"
+	"context"
 	"golang.org/x/net/websocket"
 )
 

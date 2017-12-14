@@ -10,7 +10,7 @@ import (
 	. "github.com/jaracil/nexus/log"
 	"github.com/rifflock/lfshook"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
+	"context"
 )
 
 var (

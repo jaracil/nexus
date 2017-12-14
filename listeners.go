@@ -5,7 +5,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	. "github.com/jaracil/nexus/log"
-	"golang.org/x/net/context"
+	"context"
 )
 
 func listen() {
