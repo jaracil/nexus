@@ -19,10 +19,10 @@ func TestUserCreateFail(t *testing.T) {
 		t.Errorf("user.create empty: expecting error")
 		RootSes.UserDelete("")
 	}
-	_, err = RootSes.UserCreate("!invalid", "mypass")
+	_, err = RootSes.UserCreate("invalid user", "mypass")
 	if err == nil {
 		t.Errorf("user.create invalid: expecting error")
-		RootSes.UserDelete("!invalid")
+		RootSes.UserDelete("invalid user")
 	}
 	_, err = RootSes.UserCreate("sh", "tooshort")
 	if err == nil {
