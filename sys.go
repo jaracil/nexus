@@ -10,7 +10,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
 	"github.com/nayarsystems/nxgo/nxcore"
