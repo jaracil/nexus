@@ -142,6 +142,7 @@ func nodeTrack() {
 
 							masterCtx, masterCancel = context.WithCancel(context.Background())
 							go searchOrphaned(masterCtx)
+							go searchUncompleted(masterCtx)
 						}
 					} else {
 						if isMasterNode() {
