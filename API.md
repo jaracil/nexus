@@ -1,7 +1,15 @@
 # Versions
 
 ## 1.8.x
+### Modified:
   * `user.list` return value elements include a new field `createdAt` with a timestamp of user creation
+
+### New:
+  * `user.rename`
+  * `*.count` methods
+  * `sync.list`
+  * `topic.list`
+  * `depth` and `filter` parameters for `*.list` methods
 
 ## 1.7.x
   * `user.getEffectiveTags`
@@ -91,6 +99,7 @@
     * [sys.login](#syslogin)
     * [sys.node.list](#sysnodelist)
     * [sys.session.list](#syssessionlist)
+    * [sys.session.count](#syssessioncount)
     * [sys.session.kick](#syssessionkick)
     * [sys.session.reload](#syssessionreload)
   * [Pipes](#pipes)
@@ -101,6 +110,8 @@
   * [Sync](#sync)
     * [sync.lock](#synclock)
     * [sync.unlock](#syncunlock)
+    * [sync.list](#synclist)
+    * [sync.count](#synccount)
   * [Tasks](#tasks)
     * [task.push](#taskpush)
     * [task.pull](#taskpull)
@@ -109,14 +120,19 @@
     * [task.reject](#taskreject)
     * [task.cancel](#taskcancel)
     * [task.list](#tasklist)
+    * [task.count](#taskccount)
   * [Topics](#topics)
     * [topic.sub](#topicsub)
     * [topic.unsub](#topicunsub)
     * [topic.pub](#topicpub)
+    * [topic.list](#topiclist)
+    * [topic.count](#topiccount)
   * [Users](#users)
     * [user.create](#usercreate)
     * [user.delete](#userdelete)
+    * [user.rename](#userrename)
     * [user.list](#userlist)
+    * [user.count](#usercount)
     * [user.setTags](#usersettags)
     * [user.delTags](#userdeltags)
     * [user.getTags](#usergettags)
@@ -193,11 +209,27 @@ List the active sessions for an user prefix on the cluster.
 
 ### Parameters:
 * `"prefix": <String>` - Username prefix to list from
+* `"depth": <Number>` - *Optional* - Filter the sessions listed to the passed depth relative to the passed prefix. Defaults to -1 (no filtering)
+* `"filter": <String>` - *Optional* - Filter the sessions by user based on the passed RE2 regexp
 * `"limit": <Number>` - *Optional* - Limit the number of results. Defaults to 100
 * `"skip": <Number>` - *Optional* - Skips a number of results. Defaults to 0
 
 ### Result:
     "result": [{"sessions":[{"creationTime":"2016-08-30T12:39:16.39Z","connid":"687c3b7baf4b9471","nodeid":"687c3b7b","protocol":"tcp","remoteAddress":"172.17.0.1:51398"},{"creationTime":"2016-08-30T12:39:21.283Z","id":"687c3b7b407bcce2","nodeid":"687c3b7b","protocol":"tcp","remoteAddress":"172.17.0.1:51402"}],"user":"root","n":2}, ...]
+
+## sys.session.count
+Count the active sessions for an user prefix on the cluster.
+
+### Parameters:
+* `"prefix": <String>` - Username prefix to count from
+* `"filter": <String>` - *Optional* - Filter the sessions by user based on the passed RE2 regexp
+* `"subprefixes": <Boolean>` - *Optional* - Return a detailed count for each subprefix. Defaults to false
+
+### Result (without subprefixes):
+    "result": {"count": 55}
+
+### Result (with subprefixes):
+    "result": [{"prefix": "root", "count": 12}, {"prefix": "root.sub1", "count": "10"}, {"prefix": "root.sub2", "count": 2}]
 
 ## sys.session.kick
 Terminates any connection which session id matches the prefix.
@@ -287,6 +319,33 @@ Frees a lock, cluster-wide.
 ### Result:
     "result": { "ok": true }
 
+## sync.list
+List the active locks for a prefix on the cluster.
+
+### Parameters:
+* `"prefix": <String>` - Lock prefix to list from
+* `"depth": <Number>` - *Optional* - Filter the locks listed to the passed depth relative to the passed prefix. Defaults to -1 (no filtering)
+* `"filter": <String>` - *Optional* - Filter the locks by prefix based on the passed RE2 regexp
+* `"limit": <Number>` - *Optional* - Limit the number of results. Defaults to 100
+* `"skip": <Number>` - *Optional* - Skips a number of results. Defaults to 0
+
+### Result:
+    "result": [{"id": "lock.1", "owner": "root"}, {"id": "lock.2", "owner": "test"}]
+
+## sync.count
+Count the active locks for a prefix on the cluster.
+
+### Parameters:
+* `"prefix": <String>` - Prefix to count from
+* `"filter": <String>` - *Optional* - Filter the locks by prefix based on the passed RE2 regexp
+* `"subprefixes": <Boolean>` - *Optional* - Return a detailed count for each subprefix. Defaults to false
+
+### Result (without subprefixes):
+    "result": {"count": 55}
+
+### Result (with subprefixes):
+    "result": [{"prefix": "root", "count": 12}, {"prefix": "root.sub1", "count": "10"}, {"prefix": "root.sub2", "count": 2}]
+
 # Tasks
 
 ## task.push
@@ -369,11 +428,27 @@ List tasks happening inside a prefix and its properties
 
 ### Parameters:
 * `"prefix": <String>` - Path prefix
+* `"depth": <Number>` - *Optional* - Filter the tasks listed to the passed depth relative to the passed prefix. Defaults to -1 (no filtering)
+* `"filter": <String>` - *Optional* - Filter the tasks by prefix based on the passed RE2 regexp
 * `"limit": <Number>` - *Optional* - Limit the number of results. Defaults to 100
 * `"skip": <Number>` - *Optional* - Skips a number of results. Defaults to 0
 
 ### Result:
     "result":  [{"id":"687c3b7bfbcdae7cb774d215cf923252f3fb","state":"waiting","path":"test.","priority":0,"ttl":0,"detached":false,"user":"root","method":"","params":null,"targetSession":"","result":null,"errCode":null,"errString":"","errObject":null,"tags":null,"creationTime":"2016-08-31T09:44:16.316Z","deadline":"2016-08-31T09:45:16.316Z"}, ...]
+
+## task.count
+Count the active tasks (with push and pull count) for a prefix on the cluster.
+
+### Parameters:
+* `"prefix": <String>` - Prefix to count from
+* `"filter": <String>` - *Optional* - Filter the tasks by prefix based on the passed RE2 regexp
+* `"subprefixes": <Boolean>` - *Optional* - Return a detailed count for each subprefix. Defaults to false
+
+### Result (without subprefixes):
+    "result": {"count": 55, "pushCount": 25, "pullCount": 30}
+
+### Result (with subprefixes):
+    "result": [{"prefix": "root", "count": 12, "pushCount": 6, "pullCount": 6}, {"prefix": "root.sub1", "count": "10", "pushCount": 2, "pullCount": 8}, {"prefix": "root.sub2", "count": 2, "pushCount": 0, "pullCount": 2}]
 
 
 # Topics
@@ -409,6 +484,32 @@ Publish data to a topic.
 ### Result:
     "result": { "ok": true }
 
+## topic.list
+List the active topic subscriptions for a prefix on the cluster.
+
+### Parameters:
+* `"prefix": <String>` - Topic prefix to list from
+* `"depth": <Number>` - *Optional* - Filter the topics listed to the passed depth relative to the passed prefix. Defaults to -1 (no filtering)
+* `"filter": <String>` - *Optional* - Filter the topics by prefix based on the passed RE2 regexp
+* `"limit": <Number>` - *Optional* - Limit the number of results. Defaults to 100
+* `"skip": <Number>` - *Optional* - Skips a number of results. Defaults to 0
+
+### Result:
+    "result": [{"topic": "some.topic", "subscribers": 3}, {"topic": "some.other.topic", "subscribers": 5}]
+
+## topic.count
+Count the active topic subscriptions for a topic prefix on the cluster.
+
+### Parameters:
+* `"prefix": <String>` - Topic prefix to count from
+* `"filter": <String>` - *Optional* - Filter the topics by prefix based on the passed RE2 regexp
+* `"subprefixes": <Boolean>` - *Optional* - Return a detailed count for each subprefix. Defaults to false
+
+### Result (without subprefixes):
+    "result": {"count": 55}
+
+### Result (with subprefixes):
+    "result": [{"prefix": "root", "count": 12}, {"prefix": "root.sub1", "count": "10"}, {"prefix": "root.sub2", "count": 2}]
 
 # Users
 
@@ -431,16 +532,43 @@ Delete an existent user
 ### Result:
     "result": { "ok": true }
 
+## user.rename
+Change the username of a user
+
+### Parameters:
+* `"user": <String>` - Username of the user
+* `"new": <String>` - New username
+
+### Result:
+    "result": { "ok": true }
+
+
 ## user.list
 Lists users which username starts with a prefix
 
 ### Parameters:
 * `"prefix": <String>` - Prefix where the tags will take effect
+* `"depth": <Number>` - *Optional* - Filter the users listed to the passed depth relative to the passed prefix. Defaults to -1 (no filtering)
+* `"filter": <String>` - *Optional* - Filter the users by prefix based on the passed RE2 regexp
 * `"limit": <Number>` - *Optional* - Limit the number of results. Defaults to 100
 * `"skip": <Number>` - *Optional* - Skips a number of results. Defaults to 0
 
 ### Result:
-    "result": [{"blacklist":["172.17.*"],"maxsessions":42,"tags":{test":{"@admin":true}},"templates":["template1","auth-token"],"user":"test","whitelist":["172.17.0.1"]},]
+    "result": [{"blacklist":["172.17.*"],"maxsessions":42,"tags":{test":{"@admin":true}},"templates":["template1","auth-token"],"user":"test","whitelist":["172.17.0.1"],"createdAt":"2016-08-31T09:45:16.316Z"}]
+
+## user.count
+Count the users on a prefix on the cluster.
+
+### Parameters:
+* `"prefix": <String>` - Username prefix to count from
+* `"filter": <String>` - *Optional* - Filter the users by prefix based on the passed RE2 regexp
+* `"subprefixes": <Boolean>` - *Optional* - Return a detailed count for each subprefix. Defaults to false
+
+### Result (without subprefixes):
+    "result": {"count": 55}
+
+### Result (with subprefixes):
+    "result": [{"prefix": "root", "count": 12}, {"prefix": "root.sub1", "count": "10"}, {"prefix": "root.sub2", "count": 2}]
 
 
 ## user.setTags
