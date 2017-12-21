@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
+	"github.com/sirupsen/logrus"
 	r "gopkg.in/gorethink/gorethink.v3"
 )
 
@@ -560,52 +560,82 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			return
 		}
 
-		var term r.Term
+		var pushTerm, pullTerm, term r.Term
 		if countSubprefixes {
 			if prefix == "" {
-				term = r.Table("tasks")
+				pushTerm = r.Table("tasks")
+				pullTerm = r.Table("tasks").Between("@pull.", "@pull.\uffff", r.BetweenOpts{Index: "path"})
 				if filter != "" {
-					term = term.Filter(r.Row.Field("path").Match(filter))
+					pushTerm = pushTerm.Filter(r.Row.Field("path").Match(filter))
+					pullTerm = pullTerm.Filter(r.Row.Field("path").Match(filter))
 				}
-				term = term.Group(r.Row.Field("path").Match("^((?:@pull[.])??[^.]*)[.](?:[^.]*[.])*$").Field("groups").Nth(0).Field("str")).Count().Ungroup().Map(func(t r.Term) r.Term {
-					return r.Branch(t.HasFields("group"), r.Object("prefix", t.Field("group"), "count", t.Field("reduction")), r.Object("prefix", "", "count", t.Field("reduction")))
+
+				pushTerm = pushTerm.Group(r.Row.Field("path").Match("^([^@.][^.]*)[.](?:[^.]*[.])*$").Field("groups").Nth(0).Field("str")).Count().Ungroup().Filter(func(t r.Term) r.Term {
+					return t.HasFields("group")
+				}).Map(func(t r.Term) r.Term {
+					return r.Object("prefix", t.Field("group"), "count", t.Field("reduction"))
+				})
+
+				pullTerm = pullTerm.Group(r.Row.Field("path").Match("^@pull[.]([^.]*)[.](?:[^.]*[.])*$").Field("groups").Nth(0).Field("str")).Count().Ungroup().Filter(func(t r.Term) r.Term {
+					return t.HasFields("group")
+				}).Map(func(t r.Term) r.Term {
+					return r.Object("prefix", t.Field("group"), "count", t.Field("reduction"))
 				})
 			} else {
-				term = r.Table("tasks").Between(prefix+".", prefix+".\uffff", r.BetweenOpts{Index: "path"}).Union(r.Table("tasks").Between("@pull."+prefix+".", "@pull."+prefix+".\uffff", r.BetweenOpts{Index: "path"}))
+				pushTerm = r.Table("tasks").Between(prefix+".", prefix+".\uffff", r.BetweenOpts{Index: "path"})
+				pullTerm = r.Table("tasks").Between("@pull."+prefix+".", "@pull."+prefix+".\uffff", r.BetweenOpts{Index: "path"})
 				if filter != "" {
-					term = term.Filter(r.Row.Field("path").Match(filter))
+					pushTerm = pushTerm.Filter(r.Row.Field("path").Match(filter))
+					pullTerm = pullTerm.Filter(r.Row.Field("path").Match(filter))
 				}
-				term = term.Group(r.Row.Field("path").Match(fmt.Sprintf("^((?:@pull[.])??%s[.][^.]*)[.](?:[^.]*[.])*$", prefix)).Field("groups").Nth(0).Field("str")).Count().Ungroup().Map(func(t r.Term) r.Term {
-					return r.Branch(t.HasFields("group"), r.Object("prefix", t.Field("group"), "count", t.Field("reduction")), r.Object("prefix", prefix, "count", t.Field("reduction")))
+				pushTerm = pushTerm.Group(r.Row.Field("path").Match(fmt.Sprintf("^(%s(?:[.][^.]*)?)[.](?:[^.]*[.])*$", prefix)).Field("groups").Nth(0).Field("str")).Count().Ungroup().Filter(func(t r.Term) r.Term {
+					return t.HasFields("group")
+				}).Map(func(t r.Term) r.Term {
+					return r.Object("prefix", t.Field("group"), "count", t.Field("reduction"))
+				})
+				pullTerm = pullTerm.Group(r.Row.Field("path").Match(fmt.Sprintf("^@pull[.](%s(?:[.][^.]*)?)[.](?:[^.]*[.])*$", prefix)).Field("groups").Nth(0).Field("str")).Count().Ungroup().Filter(func(t r.Term) r.Term {
+					return t.HasFields("group")
+				}).Map(func(t r.Term) r.Term {
+					return r.Object("prefix", t.Field("group"), "count", t.Field("reduction"))
 				})
 			}
-			cur, err := term.Run(db)
+			pushCur, err := pushTerm.Run(db)
 			if err != nil {
 				req.Error(ErrInternal, err.Error(), nil)
 				return
 			}
-			var all []interface{}
-			if err := cur.All(&all); err != nil {
+			var pushAll []interface{}
+			if err := pushCur.All(&pushAll); err != nil {
+				req.Error(ErrInternal, "", nil)
+				return
+			}
+			pullCur, err := pullTerm.Run(db)
+			if err != nil {
+				req.Error(ErrInternal, err.Error(), nil)
+				return
+			}
+			var pullAll []interface{}
+			if err := pullCur.All(&pullAll); err != nil {
 				req.Error(ErrInternal, "", nil)
 				return
 			}
 
 			res := []interface{}{}
 			countPulls := map[string]int{}
-			for _, v := range all {
-				p := ei.N(v).M("prefix").StringZ()
-				if strings.HasPrefix(p, "@pull.") {
-					p = strings.SplitAfterN(p, ".", 2)[1]
-					countPulls[p] = ei.N(v).M("count").IntZ()
-				}
+			for _, v := range pullAll {
+				countPulls[ei.N(v).M("prefix").StringZ()] = ei.N(v).M("count").IntZ()
 			}
-			for _, v := range all {
+			for _, v := range pushAll {
 				p := ei.N(v).M("prefix").StringZ()
 				if !strings.HasPrefix(p, "@pull.") {
 					pullCount := countPulls[p]
+					delete(countPulls, p)
 					pushCount := ei.N(v).M("count").IntZ()
 					res = append(res, ei.M{"prefix": p, "count": pushCount + pullCount, "pullCount": pullCount, "pushCount": pushCount})
 				}
+			}
+			for p, v := range countPulls {
+				res = append(res, ei.M{"prefix": p, "count": v, "pullCount": v, "pushCount": 0})
 			}
 			req.Result(res)
 
