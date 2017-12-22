@@ -92,6 +92,22 @@ func dbBootstrap() error {
 		}
 
 	}
+	cur, err = r.Table("users").IndexList().Run(db)
+	usersIndexList := make([]string, 0)
+	err = cur.All(&usersIndexList)
+	cur.Close()
+	if err != nil {
+		return err
+	}
+	if !inStrSlice(usersIndexList, "blockedBy") {
+		Log.Println("Creating blockedBy index on users sessions")
+		_, err := r.Table("users").IndexCreateFunc("blockedBy", func(row r.Term) interface{} {
+			return row.Field("blockedBy")
+		}).RunWrite(db)
+		if err != nil {
+			return err
+		}
+	}
 	if !inStrSlice(tablelist, "sessions") {
 		Log.Println("Creating sessions table")
 		_, err := r.TableCreate("sessions").RunWrite(db)
