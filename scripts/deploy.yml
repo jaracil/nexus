@@ -1,0 +1,50 @@
+- name: Deploy a new nexus release
+  hosts: nexus
+  remote_user: root
+  gather_facts: no
+
+  serial: 1
+
+  vars_prompt:
+    - name: "version"
+      prompt: "Which version are we deploying?"
+      private: no
+
+  tasks:
+    - name: Copy nexus binary to host
+      copy: src=../nexus dest=/tmp/nexus mode=755
+
+    - name: Get new binary version
+      shell: /tmp/nexus --version
+      register: newversion
+
+    - name: Assert versions are correct
+      fail: msg="Specified manual version check and binary version do not match {{ version }} != {{ newversion.stdout }}"
+      when: version != newversion.stdout
+
+    - name: Get old binary version
+      shell: /opt/nexus/nexus --version
+      register: oldversion
+
+    - name: Get date
+      shell: date +%s
+      register: date
+
+    - name: Backup old nexus binary
+      shell: cp /opt/nexus/nexus /opt/nexus/old/nexus.{{ oldversion.stdout }}.{{ date.stdout }}
+
+    - name: Move new nexus binary
+      shell: mv /tmp/nexus /opt/nexus/nexus
+
+  # - name: Upload systemd service file
+  #   copy:
+
+    - name: Restart services?
+      pause: prompt='Restart the nexus services?'
+
+    - name: Restart services
+      systemd:
+        name: nexus.service
+        daemon_reload: yes
+        state: restarted
+        enabled: yes

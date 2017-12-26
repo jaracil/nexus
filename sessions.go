@@ -1,9 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
 	r "gopkg.in/gorethink/gorethink.v3"
@@ -59,22 +60,17 @@ func sessionTrack() {
 func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 	switch req.Method {
 	case "sys.session.list":
-		prefix := ei.N(req.Params).M("prefix").Lower().StringZ()
-		limit, err := ei.N(req.Params).M("limit").Int()
-		if err != nil {
-			limit = 100
-		}
-		skip, err := ei.N(req.Params).M("skip").Int()
-		if err != nil {
-			skip = 0
-		}
+		prefix, depth, filter, limit, skip := getListParams(req.Params)
+
 		tags := nc.getTags(prefix)
 		if !(ei.N(tags).M("@sys.session.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		term := r.Table("sessions").
-			Between(prefix, prefix+"\uffff", r.BetweenOpts{Index: "users"}).
+
+		term := getListTerm("sessions", "users", "user", prefix, depth, filter, limit, skip)
+
+		term = term.
 			Map(func(row r.Term) interface{} {
 				return ei.M{"user": row.Field("user"),
 					"connid":        row.Field("id"),
@@ -86,14 +82,6 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 			Group("user").
 			Pluck("connid", "nodeid", "remoteAddress", "creationTime", "protocol").
 			Filter(r.Row.Field("protocol").Ne("internal"))
-
-		if skip >= 0 {
-			term = term.Skip(skip)
-		}
-
-		if limit > 0 {
-			term = term.Limit(limit)
-		}
 
 		cur, err := term.Ungroup().
 			Map(func(row r.Term) interface{} {
@@ -111,6 +99,66 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 			return
 		}
 		req.Result(all)
+
+	case "sys.session.count":
+		prefix := getPrefixParam(req.Params)
+		filter := ei.N(req.Params).M("filter").StringZ()
+		countSubprefixes := ei.N(req.Params).M("subprefixes").BoolZ()
+
+		tags := nc.getTags(prefix)
+		if !(ei.N(tags).M("@sys.session.count").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+
+		var term r.Term
+		if countSubprefixes {
+			if prefix == "" {
+				term = r.Table("sessions").Filter(r.Row.Field("protocol").Ne("internal"))
+				if filter != "" {
+					term = term.Filter(r.Row.Field("user").Match(filter))
+				}
+				term = term.Group(r.Row.Field("user").Match("^([^.]*)(?:[.][^.]*)*$").Field("groups").Nth(0).Field("str")).Count().Ungroup().Map(func(t r.Term) r.Term {
+					return r.Branch(t.HasFields("group"), r.Object("prefix", t.Field("group"), "count", t.Field("reduction")), r.Object("prefix", "", "count", t.Field("reduction")))
+				})
+			} else {
+				term = r.Table("sessions").GetAllByIndex("users", prefix).Union(r.Table("sessions").Between(prefix+".", prefix+".\uffff", r.BetweenOpts{Index: "users"})).Filter(r.Row.Field("protocol").Ne("internal"))
+				if filter != "" {
+					term = term.Filter(r.Row.Field("user").Match(filter))
+				}
+				term = term.Group(r.Row.Field("user").Match(fmt.Sprintf("^%s[.]([^.]*)(?:[.][^.]*)*$", prefix)).Field("groups").Nth(0).Field("str")).Count().Ungroup().Map(func(t r.Term) r.Term {
+					return r.Branch(t.HasFields("group"), r.Object("prefix", r.Add(prefix+".", t.Field("group")), "count", t.Field("reduction")), r.Object("prefix", prefix, "count", t.Field("reduction")))
+				})
+			}
+		} else {
+			if prefix == "" {
+				term = r.Table("sessions").Filter(r.Row.Field("protocol").Ne("internal"))
+			} else {
+				term = r.Table("sessions").GetAllByIndex("users", prefix).Union(r.Table("sessions").Between(prefix+".", prefix+".\uffff", r.BetweenOpts{Index: "users"})).Filter(r.Row.Field("protocol").Ne("internal"))
+			}
+			if filter != "" {
+				term = term.Filter(r.Row.Field("user").Match(filter))
+			}
+			term = term.Count()
+		}
+
+		cur, err := term.Run(db)
+		if err != nil {
+			req.Error(ErrInternal, err.Error(), nil)
+			return
+		}
+		var all []interface{}
+		if err := cur.All(&all); err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+		if countSubprefixes {
+			req.Result(all)
+		} else if len(all) > 0 {
+			req.Result(ei.M{"count": all[0]})
+		} else {
+			req.Result(ei.M{"count": 0})
+		}
 
 	case "sys.session.kick":
 		fallthrough

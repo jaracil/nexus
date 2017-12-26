@@ -1,12 +1,14 @@
-hash: 98730afbe3c421a640145839cb7e5e73043f9f170b2b82b44e135585e0a32538
-updated: 2017-05-26T12:43:20.467001642+02:00
+hash: beaaf4a82e7648aaf8b4a5ea0993c71f525fde95b1fcce0306cf971cba4d2c39
+updated: 2017-12-19T16:05:53.601111118+01:00
 imports:
 - name: github.com/armon/go-proxyproto
   version: 3daa90aec0039a806299b9078f4422fee950f33c
 - name: github.com/cenkalti/backoff
   version: 32cd0c5b3aef12c76ed64aaf678f6c79736be7dc
-- name: github.com/dancannon/gorethink
-  version: 7ab832f7b65573104a555d84a27992ae9ea1f659
+- name: github.com/go-ole/go-ole
+  version: de8695c8edbf8236f30d6e1376e20b198a028d42
+  subpackages:
+  - oleutil
 - name: github.com/golang/protobuf
   version: 2bba0603135d7d7f5cb73b2125beeda19c09f4ef
   subpackages:
@@ -26,20 +28,22 @@ imports:
 - name: github.com/jaracil/wsck
   version: 231d4ce784ed48570092761a0da88a37c62f79df
 - name: github.com/jessevdk/go-flags
-  version: 48cf8722c3375517aba351d1f7577c40663a4407
+  version: 96dc06278ce32a0e9d957d590bb987c81ee66407
 - name: github.com/nayarsystems/nxgo
   version: 3e45c07da004bb85a3443f22386131d731cc89dd
   subpackages:
   - nxcore
 - name: github.com/rifflock/lfshook
-  version: 1ae91782cf87524466b000ea12d8291ea48269be
+  version: 1e6869029fcba52a12e98696e95dc1f0fb33702f
 - name: github.com/shirou/gopsutil
-  version: 9af92986dda65a8c367157a82b484553e1ec1c55
+  version: bfe3c2e8f406bf352bc8df81f98c752224867349
   subpackages:
   - internal/common
   - load
-- name: github.com/Sirupsen/logrus
-  version: ba1b36c82c5e05c4f912a88eab0dcd91a171688f
+- name: github.com/sirupsen/logrus
+  version: d682213848ed68c0a260ca37d6dd5ace8423f5ba
+- name: github.com/StackExchange/wmi
+  version: 9f32b5905fd6ce7384093f9d048437e79f7b4d85
 - name: github.com/tylerb/graceful
   version: 4654dfbb6ad53cb5e27f37d99b02e16c1872fbbb
 - name: golang.org/x/crypto
@@ -47,6 +51,7 @@ imports:
   subpackages:
   - pbkdf2
   - scrypt
+  - ssh/terminal
 - name: golang.org/x/net
   version: da118f7b8e5954f39d0d2130ab35d4bf0e3cb344
   subpackages:
@@ -56,10 +61,11 @@ imports:
   version: 8c0a5eacbac818f9011015b17992f53d9cec3e8f
   subpackages:
   - unix
+  - windows
 - name: gopkg.in/fatih/pool.v2
   version: 6e328e67893eb46323ad06f0e92cb9536babbabc
 - name: gopkg.in/gorethink/gorethink.v3
-  version: 7ab832f7b65573104a555d84a27992ae9ea1f659
+  version: 7f5bdfd858bb064d80559b2a32b86669c5de5d3b
   subpackages:
   - encoding
   - ql2

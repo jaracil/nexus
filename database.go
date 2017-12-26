@@ -84,13 +84,29 @@ func dbBootstrap() error {
 			return err
 		}
 		Log.Println("Creating root user")
-		ud := UserData{User: "root", Salt: safeId(16), Tags: map[string]map[string]interface{}{".": {"@admin": true}}}
+		ud := UserData{User: "root", Salt: safeId(16), Tags: map[string]map[string]interface{}{".": {"@admin": true}}, CreatedAt: time.Now()}
 		ud.Pass, err = HashPass("root", ud.Salt)
 		_, err = r.Table("users").Insert(&ud).RunWrite(db)
 		if err != nil {
 			return err
 		}
 
+	}
+	cur, err = r.Table("users").IndexList().Run(db)
+	usersIndexList := make([]string, 0)
+	err = cur.All(&usersIndexList)
+	cur.Close()
+	if err != nil {
+		return err
+	}
+	if !inStrSlice(usersIndexList, "blockedBy") {
+		Log.Println("Creating blockedBy index on users sessions")
+		_, err := r.Table("users").IndexCreateFunc("blockedBy", func(row r.Term) interface{} {
+			return row.Field("blockedBy")
+		}).RunWrite(db)
+		if err != nil {
+			return err
+		}
 	}
 	if !inStrSlice(tablelist, "sessions") {
 		Log.Println("Creating sessions table")
@@ -151,6 +167,15 @@ func dbBootstrap() error {
 	cur.Close()
 	if err != nil {
 		return err
+	}
+	if !inStrSlice(tasksIndexlist, "path") {
+		Log.Println("Creating path index on tasks table")
+		_, err := r.Table("tasks").IndexCreateFunc("path", func(row r.Term) interface{} {
+			return row.Field("path")
+		}).RunWrite(db)
+		if err != nil {
+			return err
+		}
 	}
 	if !inStrSlice(tasksIndexlist, "pspc") {
 		Log.Println("Creating pspc index on tasks table")

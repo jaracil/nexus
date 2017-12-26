@@ -2,6 +2,7 @@ package main
 
 import (
 	"strings"
+	"time"
 
 	"github.com/jaracil/ei"
 	r "gopkg.in/gorethink/gorethink.v3"
@@ -13,6 +14,7 @@ type UserData struct {
 	Salt      string                            `gorethink:"salt,omitempty"`
 	Tags      map[string]map[string]interface{} `gorethink:"tags,omitempty"`
 	Templates []string                          `gorethink:"templates,omitempty"`
+	CreatedAt time.Time                         `gorethink:"createdAt,omitempty"`
 
 	// Limits
 	Mask        map[string]map[string]interface{} `gorethink:"mask,omitempty"`
@@ -29,7 +31,7 @@ const DEFAULT_MAX_SESSIONS = 50
 func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 	switch req.Method {
 	case "user.create":
-		user, err := ei.N(req.Params).M("user").Lower().F(checkRegexp, _userRegexp).F(checkLen, _userMinLen, _userMaxLen).String()
+		user, err := ei.N(req.Params).M("user").Lower().F(checkRegexp, _prefixRegexp).F(checkNotEmptyLabels).F(checkLen, _userMinLen, _userMaxLen).String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "user", nil)
 			return
@@ -44,7 +46,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		ud := UserData{User: user, Salt: safeId(16), Tags: map[string]map[string]interface{}{}, Templates: []string{}, MaxSessions: DEFAULT_MAX_SESSIONS, Disabled: false}
+		ud := UserData{User: user, Salt: safeId(16), Tags: map[string]map[string]interface{}{}, Templates: []string{}, MaxSessions: DEFAULT_MAX_SESSIONS, Disabled: false, CreatedAt: time.Now()}
 		ud.Pass, err = HashPass(pass, ud.Salt)
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
@@ -91,6 +93,70 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		} else {
 			req.Error(ErrInvalidUser, "", nil)
 		}
+
+	case "user.rename":
+		user, err := ei.N(req.Params).M("user").Lower().String()
+		if err != nil {
+			req.Error(ErrInvalidParams, "user", nil)
+			return
+		}
+		newUser, err := ei.N(req.Params).M("new").Lower().F(checkRegexp, _prefixRegexp).F(checkNotEmptyLabels).F(checkLen, _userMinLen, _userMaxLen).String()
+		if err != nil {
+			req.Error(ErrInvalidParams, "new", nil)
+			return
+		}
+		oldUserTags := nc.getTags(user)
+		if !(ei.N(oldUserTags).M("@"+req.Method).BoolZ() || ei.N(oldUserTags).M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+		newUserTags := nc.getTags(newUser)
+		if !(ei.N(newUserTags).M("@"+req.Method).BoolZ() || ei.N(newUserTags).M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+
+		_, err = r.Table("users").Insert(map[string]interface{}{"id": newUser, "blockedBy": req.nc.connId, "renaming": "me"}).RunWrite(db, r.RunOpts{Durability: "hard"})
+		if err != nil {
+			if r.IsConflictErr(err) {
+				req.Error(ErrUserExists, "", nil)
+			} else {
+				req.Error(ErrInternal, "", nil)
+			}
+			return
+		}
+
+		res, err := r.Table("users").Get(user).Update(map[string]interface{}{"blockedBy": req.nc.connId, "renaming": newUser}, r.UpdateOpts{ReturnChanges: true}).RunWrite(db, r.RunOpts{Durability: "hard"})
+		if err != nil {
+			r.Table("users").Get(newUser).Delete().RunWrite(db)
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+		if res.Unchanged == 0 && res.Replaced == 0 {
+			r.Table("users").Get(newUser).Delete().RunWrite(db)
+			req.Error(ErrInvalidUser, "", nil)
+			return
+		}
+		newUserData := ei.N(res.Changes[0].OldValue).MapStrZ()
+		newUserData["id"] = newUser
+
+		res, err = r.Table("users").Get(newUser).Replace(newUserData).RunWrite(db, r.RunOpts{Durability: "hard"})
+		if err != nil || (res.Unchanged == 0 && res.Replaced == 0) {
+			r.Table("users").Get(newUser).Delete().RunWrite(db)
+			r.Table("users").Get(user).Replace(func(t r.Term) r.Term { return t.Without("blockedBy", "renaming") })
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+
+		res, err = r.Table("users").Get(user).Delete().RunWrite(db, r.RunOpts{Durability: "hard"})
+		if err != nil || res.Deleted == 0 {
+			r.Table("users").Get(newUser).Delete().RunWrite(db)
+			r.Table("users").Get(user).Replace(func(t r.Term) r.Term { return t.Without("blockedBy", "renaming") })
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+
+		req.Result(map[string]interface{}{"ok": true})
 
 	case "user.setTags":
 		user, err := ei.N(req.Params).M("user").Lower().String()
@@ -286,31 +352,16 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 		req.Result(map[string]interface{}{"ok": true})
 
 	case "user.list":
-		prefix := ei.N(req.Params).M("prefix").Lower().StringZ()
-		limit, err := ei.N(req.Params).M("limit").Int()
-		if err != nil {
-			limit = 100
-		}
-		skip, err := ei.N(req.Params).M("skip").Int()
-		if err != nil {
-			skip = 0
-		}
+		prefix, depth, filter, limit, skip := getListParams(req.Params)
+
 		tags := nc.getTags(prefix)
 		if !(ei.N(tags).M("@user.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		term := r.Table("users").
-			Between(prefix, prefix+"\uffff").
-			Pluck("id", "tags", "templates", "whitelist", "blacklist", "maxsessions", "disabled")
 
-		if skip >= 0 {
-			term = term.Skip(skip)
-		}
-
-		if limit > 0 {
-			term = term.Limit(limit)
-		}
+		term := getListTerm("users", "", "id", prefix, depth, filter, limit, skip).
+			Pluck("id", "tags", "templates", "whitelist", "blacklist", "maxsessions", "disabled", "createdAt")
 
 		cur, err := term.Map(func(row r.Term) interface{} {
 			return ei.M{
@@ -321,6 +372,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 				"blacklist":   row.Field("blacklist").Default(ei.S{}),
 				"maxsessions": row.Field("maxsessions").Default(DEFAULT_MAX_SESSIONS),
 				"disabled":    row.Field("disabled").Default(false),
+				"createdAt":   row.Field("createdAt").Default(time.Time{}),
 			}
 		}).Run(db)
 		if err != nil {
@@ -328,8 +380,41 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 			return
 		}
 		var all []interface{}
-		cur.All(&all)
+		if err := cur.All(&all); err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
 		req.Result(all)
+
+	case "user.count":
+		prefix := getPrefixParam(req.Params)
+		filter := ei.N(req.Params).M("filter").StringZ()
+		countSubprefixes := ei.N(req.Params).M("subprefixes").BoolZ()
+
+		tags := nc.getTags(prefix)
+		if !(ei.N(tags).M("@user.count").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+
+		term := getCountTerm("users", "", "id", prefix, filter, countSubprefixes)
+		cur, err := term.Run(db)
+		if err != nil {
+			req.Error(ErrInternal, err.Error(), nil)
+			return
+		}
+		var all []interface{}
+		if err := cur.All(&all); err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
+		if countSubprefixes {
+			req.Result(all)
+		} else if len(all) > 0 {
+			req.Result(ei.M{"count": all[0]})
+		} else {
+			req.Result(ei.M{"count": 0})
+		}
 
 	case "user.addTemplate":
 		param, err := ei.N(req.Params).M("template").String()

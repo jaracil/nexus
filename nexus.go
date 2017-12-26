@@ -7,9 +7,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	. "github.com/jaracil/nexus/log"
 	"github.com/rifflock/lfshook"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )
 
@@ -103,8 +103,7 @@ func main() {
 			logrus.ErrorLevel: opts.Logs.Path,
 			logrus.FatalLevel: opts.Logs.Path,
 			logrus.PanicLevel: opts.Logs.Path,
-		})
-		logfileFormatter.SetFormatter(Logger.Formatter)
+		}, Logger.Formatter)
 		Logger.Hooks.Add(logfileFormatter)
 	}
 

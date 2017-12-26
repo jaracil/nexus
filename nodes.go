@@ -6,10 +6,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
 	"github.com/shirou/gopsutil/load"
+	"github.com/sirupsen/logrus"
 	r "gopkg.in/gorethink/gorethink.v3"
 )
 
@@ -142,6 +142,7 @@ func nodeTrack() {
 
 							masterCtx, masterCancel = context.WithCancel(context.Background())
 							go searchOrphaned(masterCtx)
+							go searchUncompleted(masterCtx)
 						}
 					} else {
 						if isMasterNode() {
@@ -260,6 +261,80 @@ func searchOrphanedStuff(regex, what, field string) {
 					"error": err,
 					what:    s,
 				}).Errorln("Error deleting orphaned %s", what)
+			}
+		}
+	}
+}
+
+func searchUncompleted(ctx context.Context) {
+	t := time.After(time.Second)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-t:
+			t = time.After(time.Minute)
+			searchUncompletedRenames()
+		}
+	}
+}
+
+func searchUncompletedRenames() {
+	cur, err := r.Table("users").Between("", "\uffff", r.BetweenOpts{Index: "blockedBy"}).Run(db)
+	if err != nil {
+		if err != nil {
+			Log.WithFields(logrus.Fields{
+				"error": err,
+			}).Errorf("Error searching uncompleted user renames")
+			return
+		}
+	}
+	uncompleted := make([]interface{}, 0)
+	err = cur.All(&uncompleted)
+	cur.Close()
+
+	switch err {
+	default:
+		Log.WithFields(logrus.Fields{
+			"error": err,
+		}).Errorf("Error searching uncompleted user renames")
+
+	case r.ErrEmptyResult:
+
+	case nil:
+		if len(uncompleted) <= 0 {
+			return
+		}
+
+		for _, u := range uncompleted {
+			user := ei.N(u).M("id").StringZ()
+			blockedBy := ei.N(u).M("blockedBy").StringZ()
+			renaming := ei.N(u).M("renaming").StringZ()
+			if user != "" && blockedBy != "" {
+				cur, err = r.Table("sessions").Get(blockedBy).Run(db)
+				if err != nil {
+					Log.WithFields(logrus.Fields{
+						"error": err,
+					}).Errorf("Error searching uncompleted user rename session for %s", user)
+					cur.Close()
+					continue
+				}
+				if cur.IsNil() {
+					if renaming == "me" {
+						r.Table("users").Get(user).Delete().RunWrite(db)
+					} else {
+						if renaming != "" {
+							_, err = r.Table("users").Get(renaming).Delete().RunWrite(db)
+							if err != nil {
+								cur.Close()
+								continue
+							}
+						}
+						r.Table("users").Get(user).Replace(func(t r.Term) r.Term { return t.Without("blockedBy", "renaming") })
+					}
+				}
+				cur.Close()
 			}
 		}
 	}

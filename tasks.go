@@ -1,12 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
+	"github.com/sirupsen/logrus"
 	r "gopkg.in/gorethink/gorethink.v3"
 )
 
@@ -281,7 +282,7 @@ func taskExpireTtl(taskid string) {
 func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 	switch req.Method {
 	case "task.push":
-		method, err := ei.N(req.Params).M("method").Lower().String()
+		method, err := ei.N(req.Params).M("method").Lower().F(checkRegexp, _taskRegexp).F(checkNotEmptyLabels).String()
 		if err != nil {
 			req.Error(ErrInvalidParams, "method", nil)
 			return
@@ -356,7 +357,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		if req.Id == nil {
 			return
 		}
-		prefix := ei.N(req.Params).M("prefix").Lower().StringZ()
+		prefix := ei.N(req.Params).M("prefix").Lower().F(checkRegexp, _taskRegexp).F(checkNotEmptyLabels).StringZ()
 		if prefix == "" {
 			req.Error(ErrInvalidParams, "prefix", nil)
 			return
@@ -492,30 +493,39 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		}
 
 	case "task.list":
-		prefix, err := ei.N(req.Params).M("prefix").Lower().String()
-		if err != nil {
-			req.Error(ErrInvalidParams, "prefix", nil)
-			return
-		}
-		limit, err := ei.N(req.Params).M("limit").Int()
-		if err != nil {
-			limit = 100
-		}
-		skip, err := ei.N(req.Params).M("skip").Int()
-		if err != nil {
-			skip = 0
-		}
+		prefix, depth, filter, limit, skip := getListParams(req.Params)
+
 		tags := nc.getTags(prefix)
 		if !(ei.N(tags).M("@task.list").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
 			req.Error(ErrPermissionDenied, "", nil)
 			return
 		}
-		term := r.Table("tasks")
 
+		var term r.Term
+		if prefix == "" {
+			if depth < 0 {
+				term = r.Table("tasks")
+			} else if depth == 0 {
+				term = r.Table("tasks").GetAllByIndex("path", ".", "@pull.")
+			} else {
+				term = r.Table("tasks").Filter(r.Row.Field("path").Match(fmt.Sprintf("^(?:@pull[.])??(?:[^.]*[.]){0,%d}$", depth)))
+			}
+		} else {
+			if depth != 0 {
+				term = r.Table("tasks").Between(prefix+".", prefix+".\uffff", r.BetweenOpts{Index: "path"}).Union(r.Table("tasks").Between("@pull."+prefix+".", "@pull."+prefix+".\uffff", r.BetweenOpts{Index: "path"}))
+			} else {
+				term = r.Table("tasks").GetAllByIndex("path", prefix+".", "@pull."+prefix+".")
+			}
+			if depth > 0 {
+				term = term.Filter(r.Row.Field("path").Match(fmt.Sprintf("^%s(?:[.][^.]*){0,%d}[.]$", prefix, depth)))
+			}
+		}
+		if filter != "" {
+			term = term.Filter(r.Row.Field("path").Match(filter))
+		}
 		if skip >= 0 {
 			term = term.Skip(skip)
 		}
-
 		if limit > 0 {
 			term = term.Limit(limit)
 		}
@@ -526,7 +536,10 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			return
 		}
 		ret := make([]*Task, 0)
-		cur.All(&ret)
+		if err := cur.All(&ret); err != nil {
+			req.Error(ErrInternal, "", nil)
+			return
+		}
 
 		for _, task := range ret {
 			task.Path = strings.TrimPrefix(task.Path, "@pull.")
@@ -535,6 +548,148 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		}
 
 		req.Result(ret)
+
+	case "task.count":
+		prefix := getPrefixParam(req.Params)
+		filter := ei.N(req.Params).M("filter").StringZ()
+		countSubprefixes := ei.N(req.Params).M("subprefixes").BoolZ()
+
+		tags := nc.getTags(prefix)
+		if !(ei.N(tags).M("@task.count").BoolZ() || ei.N(tags).M("@admin").BoolZ()) {
+			req.Error(ErrPermissionDenied, "", nil)
+			return
+		}
+
+		var pushTerm, pullTerm, term r.Term
+		if countSubprefixes {
+			if prefix == "" {
+				pushTerm = r.Table("tasks")
+				pullTerm = r.Table("tasks").Between("@pull.", "@pull.\uffff", r.BetweenOpts{Index: "path"})
+				if filter != "" {
+					pushTerm = pushTerm.Filter(r.Row.Field("path").Match(filter))
+					pullTerm = pullTerm.Filter(r.Row.Field("path").Match(filter))
+				}
+
+				pushTerm = pushTerm.Group(r.Row.Field("path").Match("^([^@.][^.]*)[.](?:[^.]*[.])*$").Field("groups").Nth(0).Field("str")).Count().Ungroup().Filter(func(t r.Term) r.Term {
+					return t.HasFields("group")
+				}).Map(func(t r.Term) r.Term {
+					return r.Object("prefix", t.Field("group"), "count", t.Field("reduction"))
+				})
+
+				pullTerm = pullTerm.Group(r.Row.Field("path").Match("^@pull[.]([^.]*)[.](?:[^.]*[.])*$").Field("groups").Nth(0).Field("str")).Count().Ungroup().Filter(func(t r.Term) r.Term {
+					return t.HasFields("group")
+				}).Map(func(t r.Term) r.Term {
+					return r.Object("prefix", t.Field("group"), "count", t.Field("reduction"))
+				})
+			} else {
+				pushTerm = r.Table("tasks").Between(prefix+".", prefix+".\uffff", r.BetweenOpts{Index: "path"})
+				pullTerm = r.Table("tasks").Between("@pull."+prefix+".", "@pull."+prefix+".\uffff", r.BetweenOpts{Index: "path"})
+				if filter != "" {
+					pushTerm = pushTerm.Filter(r.Row.Field("path").Match(filter))
+					pullTerm = pullTerm.Filter(r.Row.Field("path").Match(filter))
+				}
+				pushTerm = pushTerm.Group(r.Row.Field("path").Match(fmt.Sprintf("^(%s(?:[.][^.]*)?)[.](?:[^.]*[.])*$", prefix)).Field("groups").Nth(0).Field("str")).Count().Ungroup().Filter(func(t r.Term) r.Term {
+					return t.HasFields("group")
+				}).Map(func(t r.Term) r.Term {
+					return r.Object("prefix", t.Field("group"), "count", t.Field("reduction"))
+				})
+				pullTerm = pullTerm.Group(r.Row.Field("path").Match(fmt.Sprintf("^@pull[.](%s(?:[.][^.]*)?)[.](?:[^.]*[.])*$", prefix)).Field("groups").Nth(0).Field("str")).Count().Ungroup().Filter(func(t r.Term) r.Term {
+					return t.HasFields("group")
+				}).Map(func(t r.Term) r.Term {
+					return r.Object("prefix", t.Field("group"), "count", t.Field("reduction"))
+				})
+			}
+			pushCur, err := pushTerm.Run(db)
+			if err != nil {
+				req.Error(ErrInternal, err.Error(), nil)
+				return
+			}
+			var pushAll []interface{}
+			if err := pushCur.All(&pushAll); err != nil {
+				req.Error(ErrInternal, "", nil)
+				return
+			}
+			pullCur, err := pullTerm.Run(db)
+			if err != nil {
+				req.Error(ErrInternal, err.Error(), nil)
+				return
+			}
+			var pullAll []interface{}
+			if err := pullCur.All(&pullAll); err != nil {
+				req.Error(ErrInternal, "", nil)
+				return
+			}
+
+			res := []interface{}{}
+			countPulls := map[string]int{}
+			for _, v := range pullAll {
+				countPulls[ei.N(v).M("prefix").StringZ()] = ei.N(v).M("count").IntZ()
+			}
+			for _, v := range pushAll {
+				p := ei.N(v).M("prefix").StringZ()
+				if !strings.HasPrefix(p, "@pull.") {
+					pullCount := countPulls[p]
+					delete(countPulls, p)
+					pushCount := ei.N(v).M("count").IntZ()
+					res = append(res, ei.M{"prefix": p, "count": pushCount + pullCount, "pullCount": pullCount, "pushCount": pushCount})
+				}
+			}
+			for p, v := range countPulls {
+				res = append(res, ei.M{"prefix": p, "count": v, "pullCount": v, "pushCount": 0})
+			}
+			req.Result(res)
+
+		} else {
+			if prefix == "" {
+				term = r.Table("tasks")
+			} else {
+				term = r.Table("tasks").Between(prefix+".", prefix+".\uffff", r.BetweenOpts{Index: "path"}).Union(r.Table("tasks").Between("@pull."+prefix+".", "@pull."+prefix+".\uffff", r.BetweenOpts{Index: "path"}))
+			}
+			if filter != "" {
+				term = term.Filter(r.Row.Field("path").Match(filter))
+			}
+			term = term.Count()
+
+			cur, err := term.Run(db)
+			if err != nil {
+				req.Error(ErrInternal, err.Error(), nil)
+				return
+			}
+			var count int
+			if err := cur.One(&count); err != nil {
+				req.Error(ErrInternal, "", nil)
+				return
+			}
+
+			if prefix == "" {
+				term = r.Table("tasks").Between("@pull.", "@pull.\uffff", r.BetweenOpts{Index: "path"})
+			} else {
+				term = r.Table("tasks").Between("@pull."+prefix+".", "@pull."+prefix+".\uffff", r.BetweenOpts{Index: "path"})
+			}
+			if filter != "" {
+				term = term.Filter(r.Row.Field("path").Match(filter))
+			}
+			term = term.Count()
+
+			cur, err = term.Run(db)
+			if err != nil {
+				req.Error(ErrInternal, err.Error(), nil)
+				return
+			}
+			var countPulls int
+			if err := cur.One(&countPulls); err != nil {
+				req.Error(ErrInternal, "", nil)
+				return
+			}
+
+			countPushes := count - countPulls
+			if countPushes < 0 {
+				countPushes = 0
+			}
+
+			req.Result(ei.M{"count": count, "pullCount": countPulls, "pushCount": countPushes})
+		}
+
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
 	}

@@ -5,7 +5,7 @@ import (
 	"net"
 	"net/url"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/armon/go-proxyproto"
 	. "github.com/jaracil/nexus/log"
 	"golang.org/x/net/context"

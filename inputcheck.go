@@ -3,12 +3,14 @@ package main
 import (
 	"errors"
 	"regexp"
+	"strings"
 
 	"github.com/jaracil/ei"
 )
 
 const (
-	_userRegexp     = "^[a-zA-Z0-9][a-zA-Z0-9-_.]*"
+	_prefixRegexp   = "^\\S*$"
+	_taskRegexp     = "^[^\\s@]\\S*$"
 	_userMinLen     = 3
 	_userMaxLen     = 500
 	_passwordMinLen = 4
@@ -42,6 +44,20 @@ func checkLen(i ei.Ei, p ...interface{}) ei.Ei {
 	}
 	if maxlen := ei.N(p[1]).IntZ(); maxlen > 0 && len(s) > maxlen {
 		return ei.N(errors.New("maxlen exceded"))
+	}
+	return i
+}
+
+func checkNotEmptyLabels(i ei.Ei, p ...interface{}) ei.Ei {
+	s, err := i.String()
+	if err != nil {
+		return ei.N(err)
+	}
+	spl := strings.Split(s, ".")
+	for _, v := range spl {
+		if v == "" {
+			return ei.N(errors.New("must not contain empty labels"))
+		}
 	}
 	return i
 }
