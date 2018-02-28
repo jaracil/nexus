@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/sirupsen/logrus"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
+	"github.com/sirupsen/logrus"
 	"github.com/tylerb/graceful"
 	"golang.org/x/net/context"
 	"golang.org/x/net/websocket"
@@ -70,7 +70,7 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 		// HTTP Bridge
 		netCli, netSrv := net.Pipe()
-		netCliBuf := bufio.NewReader(netCli)
+		netCliBuf := bufio.NewReaderSize(netCli, opts.MaxMessageSize)
 		ns := NewNexusConn(netSrv)
 		if req.TLS != nil {
 			ns.proto = "https"
@@ -85,15 +85,18 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 			resSlice, _, err := netCliBuf.ReadLine()
 			if err != nil {
 				res.WriteHeader(http.StatusInternalServerError)
+				res.Write([]byte(fmt.Sprintf(`{"jsonrpc":"2.0","id":1,"error":{"code":-32603,"message":"Error reading login response [%s]"}}`, err.Error())))
 				return
 			}
 			loginRes := ei.M{}
 			if err := json.Unmarshal(resSlice, &loginRes); err != nil {
 				res.WriteHeader(http.StatusInternalServerError)
+				res.Write([]byte(fmt.Sprintf(`{"jsonrpc":"2.0","id":1,"error":{"code":-32603,"message":"Error unmarshaling login response [%s]"}}`, err.Error())))
 				return
 			}
 			if ei.N(loginRes).M("id").IntZ() != 1 {
 				res.WriteHeader(http.StatusInternalServerError)
+				res.Write([]byte(fmt.Sprintf(`{"jsonrpc":"2.0","id":1,"error":{"code":-32603,"message":"Error on login response id"}}`)))
 				return
 			}
 			if !ei.N(loginRes).M("result").M("ok").BoolZ() {
@@ -105,6 +108,7 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		}
 		if _, err := io.Copy(netCli, req.Body); err != nil {
 			res.WriteHeader(http.StatusInternalServerError)
+			res.Write([]byte(fmt.Sprintf(`{"jsonrpc":"2.0","id":1,"error":{"code":-32603,"message":"Error sending body request [%s]"}}`, err.Error())))
 			return
 		}
 		if resSlice, err := netCliBuf.ReadBytes('\n'); err == nil {
@@ -113,6 +117,7 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 			res.Write(resSlice)
 		} else {
 			res.WriteHeader(http.StatusInternalServerError)
+			res.Write([]byte(fmt.Sprintf(`{"jsonrpc":"2.0","id":1,"error":{"code":-32603,"message":"Error reading request response [%s]"}}`, err.Error())))
 		}
 	}
 }

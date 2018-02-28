@@ -425,7 +425,7 @@ func (nc *NexusConn) recvWorker() {
 	dec := json.NewDecoder(nc.connRx)
 	for dec.More() {
 		req := &JsonRpcReq{nc: nc}
-		nc.connRx.SetLimit(1024 * 1024 * 32)
+		nc.connRx.SetLimit(int64(opts.MaxMessageSize))
 		err := dec.Decode(req)
 		if err != nil {
 			if _, ok := err.(*json.SyntaxError); ok {
