@@ -7,13 +7,14 @@ import (
 )
 
 var opts struct {
-	Listeners    []string       `short:"l" long:"listen"  description:"Listen on (tcp|tcp+proxy|ssl|ssl+proxy|http|https)://addr:port" default:"tcp://0.0.0.0:1717"`
-	Verbose      []bool         `short:"v" long:"verbose" description:"Show debug information. Set multiple times to increase verbosity"`
-	IsProduction bool           `long:"production" description:"Enables Production mode (JSON output and redacted logs for login requests)"`
-	Version      bool           `long:"version" description:"Show Nexus version"`
-	Logs         LogsOptions    `group:"Logging Options"`
-	Rethink      RethinkOptions `group:"RethinkDB Options"`
-	SSL          SSLOptions     `group:"SSL Options"`
+	Listeners      []string       `short:"l" long:"listen"  description:"Listen on (tcp|tcp+proxy|ssl|ssl+proxy|http|https)://addr:port" default:"tcp://0.0.0.0:1717"`
+	Verbose        []bool         `short:"v" long:"verbose" description:"Show debug information. Set multiple times to increase verbosity"`
+	IsProduction   bool           `long:"production" description:"Enables Production mode (JSON output and redacted logs for login requests)"`
+	MaxMessageSize int            `long:"maxmsgsize" description:"Maximum size in bytes for a jsonrpc message that can be accepted (buffer size)" default:"33554432"`
+	Version        bool           `long:"version" description:"Show Nexus version"`
+	Logs           LogsOptions    `group:"Logging Options"`
+	Rethink        RethinkOptions `group:"RethinkDB Options"`
+	SSL            SSLOptions     `group:"SSL Options"`
 }
 
 type LogsOptions struct {
