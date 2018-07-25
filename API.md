@@ -1,5 +1,9 @@
 # Versions
 
+## 1.9.x
+### Modified:
+  * `sys.login` returns a metadata field, useful for alternative login methods which need to give the user some data upon login
+
 ## 1.8.x
 ### Modified:
   * `user.list` return value elements include a new field `createdAt` with a timestamp of user creation
@@ -192,7 +196,7 @@ Else, the specified method should document which fields its expecting
 
 
 ### Result:
-      "result": { "ok": true, "connid": <string>, "user": <string>, "tags": <Object>}
+      "result": { "ok": true, "connid": <string>, "user": <string>, "tags": <Object>, "metadata": <Object>}
 
 ## sys.node.list
 List the nexus nodes connected to the cluster. Includes some info about connected clients, CPU load and nexus version for each node.

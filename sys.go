@@ -10,16 +10,17 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/sirupsen/logrus"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
 	"github.com/nayarsystems/nxgo/nxcore"
+	"github.com/sirupsen/logrus"
 	r "gopkg.in/gorethink/gorethink.v3"
 )
 
 type LoginResponse struct {
-	User string                            `json:"user"`
-	Tags map[string]map[string]interface{} `json:"tags"`
+	User     string                            `json:"user"`
+	Tags     map[string]map[string]interface{} `json:"tags"`
+	Metadata map[string]interface{}            `json:"metadata"`
 }
 
 func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
@@ -53,6 +54,7 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 	case "sys.login":
 		var user string
 		var mask map[string]map[string]interface{}
+		var metadata map[string]interface{}
 
 		// Auth
 		method := ei.N(req.Params).M("method").Lower().StringZ()
@@ -87,6 +89,7 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 			}
 			user = loginResponse.User
 			mask = loginResponse.Tags
+			metadata = loginResponse.Metadata
 		}
 
 		// Check user limits
@@ -121,7 +124,7 @@ func (nc *NexusConn) handleSysReq(req *JsonRpcReq) {
 			"whitelist":   nc.user.Whitelist,
 			"blacklist":   nc.user.Blacklist,
 		})
-		req.Result(ei.M{"ok": true, "user": nc.user.User, "connid": nc.connId, "tags": nc.user.Tags})
+		req.Result(ei.M{"ok": true, "user": nc.user.User, "connid": nc.connId, "tags": nc.user.Tags, "metadata": metadata})
 
 	default:
 		req.Error(ErrMethodNotFound, "", nil)
