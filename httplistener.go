@@ -78,6 +78,11 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		}
 		defer ns.close()
 		defer netCli.Close()
+
+		Log.WithFields(logrus.Fields{
+			"remote": req.RemoteAddr,
+		}).Infoln("New HTTP connection")
+
 		go ns.handle()
 		if user, pass, loginData := req.BasicAuth(); loginData {
 			fmt.Fprintf(netCli, `{"jsonrpc":"2.0", "id":1, "method":"sys.login", "params":{"user":"%s", "pass":"%s"}}`, user, pass)
