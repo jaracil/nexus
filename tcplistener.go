@@ -5,16 +5,16 @@ import (
 	"net"
 	"net/url"
 
-	"github.com/sirupsen/logrus"
 	"github.com/armon/go-proxyproto"
 	. "github.com/jaracil/nexus/log"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )
 
 func tcpListener(u *url.URL, ctx context.Context, proxyed bool) {
 	defer Log.WithFields(logrus.Fields{
 		"listener": u,
-	}).Println("TCP listener finished")
+	}).Warnln("TCP listener finished")
 
 	addr, err := net.ResolveTCPAddr("tcp", u.Host)
 	if err != nil {
@@ -31,7 +31,7 @@ func tcpListener(u *url.URL, ctx context.Context, proxyed bool) {
 	if err != nil {
 		Log.WithFields(logrus.Fields{
 			"error": err,
-		}).Println("Cannot open tcpListener")
+		}).Errorln("Cannot open tcpListener")
 		exit("tcpListener goroutine error")
 		return
 	}
@@ -42,7 +42,7 @@ func tcpListener(u *url.URL, ctx context.Context, proxyed bool) {
 
 	Log.WithFields(logrus.Fields{
 		"address": u.String(),
-	}).Println("New TCP listener started")
+	}).Infoln("New TCP listener started")
 
 	go func() {
 		select {
@@ -67,7 +67,7 @@ func tcpListener(u *url.URL, ctx context.Context, proxyed bool) {
 				}).Warn("Unencrypted connection!!")
 				Log.WithFields(logrus.Fields{
 					"address": conn.RemoteAddr().String(),
-				}).Info("New TCP connection")
+				}).Infoln("New TCP connection")
 
 				nc := NewNexusConn(conn)
 				nc.proto = "tcp"
@@ -82,7 +82,7 @@ func tcpListener(u *url.URL, ctx context.Context, proxyed bool) {
 func sslListener(u *url.URL, ctx context.Context, proxyed bool) {
 	defer Log.WithFields(logrus.Fields{
 		"listener": u,
-	}).Println("SSL listener finished")
+	}).Warnln("SSL listener finished")
 
 	Log.Debugln("Loading SSL cert/key")
 	cert, err := tls.LoadX509KeyPair(opts.SSL.Cert, opts.SSL.Key)
@@ -113,7 +113,7 @@ func sslListener(u *url.URL, ctx context.Context, proxyed bool) {
 		if err != nil {
 			Log.WithFields(logrus.Fields{
 				"error": err,
-			}).Println("Cannot open ssl+proxy Listener")
+			}).Errorln("Cannot open ssl+proxy Listener")
 			exit("ssl+proxy Listener goroutine error")
 			return
 		}
@@ -136,7 +136,7 @@ func sslListener(u *url.URL, ctx context.Context, proxyed bool) {
 
 	Log.WithFields(logrus.Fields{
 		"address": u.String(),
-	}).Println("New SSL listener started")
+	}).Infoln("New SSL listener started")
 
 	go func() {
 		select {
@@ -159,7 +159,7 @@ func sslListener(u *url.URL, ctx context.Context, proxyed bool) {
 			} else {
 				Log.WithFields(logrus.Fields{
 					"remote": conn.RemoteAddr().String(),
-				}).Printf("New SSL connection")
+				}).Infoln("New SSL connection")
 				nc := NewNexusConn(conn)
 				nc.proto = "ssl"
 				go nc.handle()

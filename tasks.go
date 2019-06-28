@@ -116,7 +116,7 @@ func taskTrack() {
 			if !iter.Next(tf) {
 				Log.WithFields(logrus.Fields{
 					"error": iter.Err().Error(),
-				}).Println("Error processing taskTrack feed")
+				}).Errorln("Error processing taskTrack feed")
 				iter.Close()
 				break
 			}

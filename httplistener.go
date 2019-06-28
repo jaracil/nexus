@@ -45,7 +45,7 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 				Log.WithFields(logrus.Fields{
 					"remote": ws.RemoteAddr().String(),
 					"origin": req.Header.Get("Origin"),
-				}).Println("New WebSocket connection")
+				}).Infoln("New WebSocket connection")
 
 				nc.handle()
 			}
@@ -124,7 +124,7 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 func httpListener(u *url.URL, ctx context.Context) {
 	defer Log.WithFields(logrus.Fields{
 		"listener": u,
-	}).Println("HTTP listener finished")
+	}).Warnln("HTTP listener finished")
 	server := graceful.Server{
 		Server:  &http.Server{Addr: u.Host, Handler: http.Handler(&httpwsHandler{})},
 		Timeout: 0,
@@ -139,7 +139,7 @@ func httpListener(u *url.URL, ctx context.Context) {
 
 	Log.WithFields(logrus.Fields{
 		"address": u.String(),
-	}).Println("New HTTP listener started")
+	}).Infoln("New HTTP listener started")
 
 	err := server.ListenAndServe()
 	if ctx.Err() != nil {
@@ -157,7 +157,7 @@ func httpListener(u *url.URL, ctx context.Context) {
 func httpsListener(u *url.URL, ctx context.Context) {
 	defer Log.WithFields(logrus.Fields{
 		"listener": u,
-	}).Println("HTTPS listener finished")
+	}).Warnln("HTTPS listener finished")
 
 	server := graceful.Server{
 		Server:  &http.Server{Addr: u.Host, Handler: http.Handler(&httpwsHandler{})},
@@ -173,7 +173,7 @@ func httpsListener(u *url.URL, ctx context.Context) {
 
 	Log.WithFields(logrus.Fields{
 		"address": u.String(),
-	}).Println("New HTTPS listener started")
+	}).Infoln("New HTTPS listener started")
 
 	err := server.ListenAndServeTLS(opts.SSL.Cert, opts.SSL.Key)
 	if ctx.Err() != nil {
@@ -192,7 +192,7 @@ func httpsListener(u *url.URL, ctx context.Context) {
 func healthCheckListener(u *url.URL, ctx context.Context) {
 	defer Log.WithFields(logrus.Fields{
 		"listener": u,
-	}).Println("Health listener finished")
+	}).Warnln("Health listener finished")
 
 	server := graceful.Server{
 		Server: &http.Server{Addr: u.Host, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -210,7 +210,7 @@ func healthCheckListener(u *url.URL, ctx context.Context) {
 
 	Log.WithFields(logrus.Fields{
 		"address": u.String(),
-	}).Println("New health listener started")
+	}).Infoln("New health listener started")
 
 	err := server.ListenAndServe()
 	if ctx.Err() != nil {
