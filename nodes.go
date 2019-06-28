@@ -10,7 +10,7 @@ import (
 	. "github.com/jaracil/nexus/log"
 	"github.com/shirou/gopsutil/load"
 	"github.com/sirupsen/logrus"
-	r "gopkg.in/gorethink/gorethink.v3"
+	r "gopkg.in/gorethink/gorethink.v5"
 )
 
 var masterNode = int32(0)

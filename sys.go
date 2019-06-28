@@ -14,7 +14,7 @@ import (
 	. "github.com/jaracil/nexus/log"
 	"github.com/nayarsystems/nxgo/nxcore"
 	"github.com/sirupsen/logrus"
-	r "gopkg.in/gorethink/gorethink.v3"
+	r "gopkg.in/gorethink/gorethink.v5"
 )
 
 type LoginResponse struct {
