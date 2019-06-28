@@ -33,15 +33,6 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 			wsrv := &websocket.Server{}
 			wsrv.Handler = func(ws *websocket.Conn) {
-				if u, err := url.Parse(req.RemoteAddr); err != nil {
-					ws.Config().Origin = &url.URL{Scheme: "http", Host: "0.0.0.0"}
-				} else {
-					ws.Config().Origin = u
-				}
-				Log.WithFields(logrus.Fields{
-					"remote": ws.RemoteAddr().String(),
-				}).Println("New WebSocket connection")
-
 				nc := NewNexusConn(ws)
 				if req.TLS != nil {
 					nc.proto = "wss"
@@ -49,8 +40,16 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 					nc.proto = "ws"
 				}
 
+				ws.Config().Origin = &url.URL{Scheme: nc.proto, Host: req.RemoteAddr}
+
+				Log.WithFields(logrus.Fields{
+					"remote": ws.RemoteAddr().String(),
+					"origin": req.Header.Get("Origin"),
+				}).Println("New WebSocket connection")
+
 				nc.handle()
 			}
+
 			if wsrv.Header == nil {
 				wsrv.Header = make(map[string][]string)
 			}
