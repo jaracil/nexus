@@ -5,23 +5,23 @@ import (
 	"time"
 
 	"github.com/jaracil/ei"
-	r "gopkg.in/gorethink/gorethink.v5"
+	r "gopkg.in/rethinkdb/rethinkdb-go.v5"
 )
 
 type UserData struct {
-	User      string                            `gorethink:"id,omitempty"`
-	Pass      string                            `gorethink:"pass,omitempty"`
-	Salt      string                            `gorethink:"salt,omitempty"`
-	Tags      map[string]map[string]interface{} `gorethink:"tags,omitempty"`
-	Templates []string                          `gorethink:"templates,omitempty"`
-	CreatedAt time.Time                         `gorethink:"createdAt,omitempty"`
+	User      string                            `rethinkdb:"id,omitempty"`
+	Pass      string                            `rethinkdb:"pass,omitempty"`
+	Salt      string                            `rethinkdb:"salt,omitempty"`
+	Tags      map[string]map[string]interface{} `rethinkdb:"tags,omitempty"`
+	Templates []string                          `rethinkdb:"templates,omitempty"`
+	CreatedAt time.Time                         `rethinkdb:"createdAt,omitempty"`
 
 	// Limits
-	Mask        map[string]map[string]interface{} `gorethink:"mask,omitempty"`
-	MaxSessions int                               `gorethink:"maxsessions,omitempty"`
-	Whitelist   []string                          `gorethink:"whitelist,omitempty"`
-	Blacklist   []string                          `gorethink:"blacklist,omitempty"`
-	Disabled    bool                              `gorethink:"disabled,omitempty"`
+	Mask        map[string]map[string]interface{} `rethinkdb:"mask,omitempty"`
+	MaxSessions int                               `rethinkdb:"maxsessions,omitempty"`
+	Whitelist   []string                          `rethinkdb:"whitelist,omitempty"`
+	Blacklist   []string                          `rethinkdb:"blacklist,omitempty"`
+	Disabled    bool                              `rethinkdb:"disabled,omitempty"`
 }
 
 var Nobody *UserData = &UserData{User: "nobody", Tags: map[string]map[string]interface{}{}, MaxSessions: 100000}

@@ -7,20 +7,20 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
-	r "gopkg.in/gorethink/gorethink.v5"
+	r "gopkg.in/rethinkdb/rethinkdb-go.v5"
 )
 
 type Pipe struct {
-	Id           string      `gorethink:"id"`
-	Msg          interface{} `gorethink:"msg"`
-	Count        int64       `gorethink:"count"`
-	IsMsg        bool        `gorethink:"ismsg"`
-	CreationTime interface{} `gorethink:"creationTime,omitempty"`
+	Id           string      `rethinkdb:"id"`
+	Msg          interface{} `rethinkdb:"msg"`
+	Count        int64       `rethinkdb:"count"`
+	IsMsg        bool        `rethinkdb:"ismsg"`
+	CreationTime interface{} `rethinkdb:"creationTime,omitempty"`
 }
 
 type PipeFeed struct {
-	Old *Pipe `gorethink:"old_val"`
-	New *Pipe `gorethink:"new_val"`
+	Old *Pipe `rethinkdb:"old_val"`
+	New *Pipe `rethinkdb:"new_val"`
 }
 
 func pipeTrack() {

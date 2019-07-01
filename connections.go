@@ -16,7 +16,7 @@ import (
 	"github.com/nayarsystems/nxgo/nxcore"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
-	r "gopkg.in/gorethink/gorethink.v5"
+	r "gopkg.in/rethinkdb/rethinkdb-go.v5"
 )
 
 type JsonRpcErr struct {
