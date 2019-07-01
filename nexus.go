@@ -128,7 +128,7 @@ func main() {
 
 	listen()
 
-	Log.Println("Nexus", Version.String(), "node started")
+	Log.Infoln("Nexus", Version.String(), "node started")
 
 	<-mainContext.Done()
 	cleanNode(nodeId)
@@ -136,5 +136,5 @@ func main() {
 		time.Sleep(time.Second)
 	}
 
-	Log.Println("Nexus", Version.String(), "node stopped")
+	Log.Warnln("Nexus", Version.String(), "node stopped")
 }

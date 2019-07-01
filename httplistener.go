@@ -33,15 +33,6 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 			wsrv := &websocket.Server{}
 			wsrv.Handler = func(ws *websocket.Conn) {
-				if u, err := url.Parse(req.RemoteAddr); err != nil {
-					ws.Config().Origin = &url.URL{Scheme: "http", Host: "0.0.0.0"}
-				} else {
-					ws.Config().Origin = u
-				}
-				Log.WithFields(logrus.Fields{
-					"remote": ws.RemoteAddr().String(),
-				}).Println("New WebSocket connection")
-
 				nc := NewNexusConn(ws)
 				if req.TLS != nil {
 					nc.proto = "wss"
@@ -49,8 +40,16 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 					nc.proto = "ws"
 				}
 
+				ws.Config().Origin = &url.URL{Scheme: nc.proto, Host: req.RemoteAddr}
+
+				Log.WithFields(logrus.Fields{
+					"remote": ws.RemoteAddr().String(),
+					"origin": req.Header.Get("Origin"),
+				}).Infoln("New WebSocket connection")
+
 				nc.handle()
 			}
+
 			if wsrv.Header == nil {
 				wsrv.Header = make(map[string][]string)
 			}
@@ -79,6 +78,11 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		}
 		defer ns.close()
 		defer netCli.Close()
+
+		Log.WithFields(logrus.Fields{
+			"remote": req.RemoteAddr,
+		}).Infoln("New HTTP connection")
+
 		go ns.handle()
 		if user, pass, loginData := req.BasicAuth(); loginData {
 			fmt.Fprintf(netCli, `{"jsonrpc":"2.0", "id":1, "method":"sys.login", "params":{"user":"%s", "pass":"%s"}}`, user, pass)
@@ -125,7 +129,7 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 func httpListener(u *url.URL, ctx context.Context) {
 	defer Log.WithFields(logrus.Fields{
 		"listener": u,
-	}).Println("HTTP listener finished")
+	}).Warnln("HTTP listener finished")
 	server := graceful.Server{
 		Server:  &http.Server{Addr: u.Host, Handler: http.Handler(&httpwsHandler{})},
 		Timeout: 0,
@@ -140,7 +144,7 @@ func httpListener(u *url.URL, ctx context.Context) {
 
 	Log.WithFields(logrus.Fields{
 		"address": u.String(),
-	}).Println("New HTTP listener started")
+	}).Infoln("New HTTP listener started")
 
 	err := server.ListenAndServe()
 	if ctx.Err() != nil {
@@ -158,7 +162,7 @@ func httpListener(u *url.URL, ctx context.Context) {
 func httpsListener(u *url.URL, ctx context.Context) {
 	defer Log.WithFields(logrus.Fields{
 		"listener": u,
-	}).Println("HTTPS listener finished")
+	}).Warnln("HTTPS listener finished")
 
 	server := graceful.Server{
 		Server:  &http.Server{Addr: u.Host, Handler: http.Handler(&httpwsHandler{})},
@@ -174,7 +178,7 @@ func httpsListener(u *url.URL, ctx context.Context) {
 
 	Log.WithFields(logrus.Fields{
 		"address": u.String(),
-	}).Println("New HTTPS listener started")
+	}).Infoln("New HTTPS listener started")
 
 	err := server.ListenAndServeTLS(opts.SSL.Cert, opts.SSL.Key)
 	if ctx.Err() != nil {
@@ -193,7 +197,7 @@ func httpsListener(u *url.URL, ctx context.Context) {
 func healthCheckListener(u *url.URL, ctx context.Context) {
 	defer Log.WithFields(logrus.Fields{
 		"listener": u,
-	}).Println("Health listener finished")
+	}).Warnln("Health listener finished")
 
 	server := graceful.Server{
 		Server: &http.Server{Addr: u.Host, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -211,7 +215,7 @@ func healthCheckListener(u *url.URL, ctx context.Context) {
 
 	Log.WithFields(logrus.Fields{
 		"address": u.String(),
-	}).Println("New health listener started")
+	}).Infoln("New health listener started")
 
 	err := server.ListenAndServe()
 	if ctx.Err() != nil {
