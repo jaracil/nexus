@@ -68,6 +68,6 @@ func TestLoginWrongStrings(t *testing.T) {
 	}
 	_, err = conn.Login(" "+UserA, UserA)
 	if !IsNexusErrCode(err, nexus.ErrPermissionDenied) {
-		t.Errorf("login with prefix space: expecting ErrPermissionDenied", err.Error())
+		t.Errorf("login with prefix space: expecting ErrPermissionDenied got %s", err.Error())
 	}
 }

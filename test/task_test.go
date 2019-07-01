@@ -25,7 +25,7 @@ func TestTaskTimeout(t *testing.T) {
 	}
 	_, err = pullconn.TaskPull(Prefix4, time.Second*1)
 	if !IsNexusErrCode(err, nexus.ErrTimeout) {
-		t.Errorf("task.pull: expecting timeout", err.Error())
+		t.Errorf("task.pull: expecting timeout got %s", err.Error())
 	}
 }
 
