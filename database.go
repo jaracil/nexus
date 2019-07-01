@@ -6,7 +6,7 @@ import (
 
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
-	r "gopkg.in/gorethink/gorethink.v3"
+	r "gopkg.in/gorethink/gorethink.v5"
 )
 
 var db *r.Session

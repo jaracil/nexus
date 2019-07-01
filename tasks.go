@@ -8,7 +8,7 @@ import (
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
 	"github.com/sirupsen/logrus"
-	r "gopkg.in/gorethink/gorethink.v3"
+	r "gopkg.in/gorethink/gorethink.v5"
 )
 
 type Task struct {

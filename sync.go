@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/jaracil/ei"
-	r "gopkg.in/gorethink/gorethink.v3"
+	r "gopkg.in/gorethink/gorethink.v5"
 )
 
 func (nc *NexusConn) handleSyncReq(req *JsonRpcReq) {

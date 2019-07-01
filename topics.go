@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/jaracil/ei"
-	r "gopkg.in/gorethink/gorethink.v3"
+	r "gopkg.in/gorethink/gorethink.v5"
 )
 
 func topicList(s string) (res []interface{}) {

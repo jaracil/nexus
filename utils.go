@@ -13,7 +13,7 @@ import (
 	"github.com/jaracil/ei"
 
 	"golang.org/x/crypto/scrypt"
-	r "gopkg.in/gorethink/gorethink.v3"
+	r "gopkg.in/gorethink/gorethink.v5"
 )
 
 func inStrSlice(slice []string, str string) bool {

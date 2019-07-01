@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/jaracil/ei"
-	r "gopkg.in/gorethink/gorethink.v3"
+	r "gopkg.in/gorethink/gorethink.v5"
 )
 
 type UserData struct {
