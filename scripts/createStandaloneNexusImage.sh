@@ -42,7 +42,7 @@ fi
 i Creating Dockerfile
 
 cat > $DCTX/Dockerfile <<EOF
-FROM rethinkdb
+FROM rethinkdb:2.3.6
 
 VOLUME /data
 

@@ -14,57 +14,20 @@ if [[ $? != 0 ]]; then
         exit
 fi
 
+s Building Nexus from parent folder...
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-#
-# Nexus stuff
-#
+cd $DIR/..
 
-s Setting local go environment...
-
-if [[ -e go/ ]]; then
-        i Go environment found.
-else 
-        w Go environment not found. Creating...
-        /usr/bin/mkdir -p go/src/github.com/jaracil/
-fi
-
-export GOPATH=$ABSPATH/go/
-i GOPATH=$GOPATH
-
-s Cloning Nexus...
-
-if [[ -e go/src/github.com/jaracil/nexus/ ]]; then
-        pushd . &>/dev/null
-        cd go/src/github.com/jaracil/nexus/
-        i git pull
-        git pull
-        popd &>/dev/null
-else 
-        git clone https://github.com/jaracil/nexus.git go/src/github.com/jaracil/nexus/
-fi
-
-
-s Building Nexus...
-
-pushd . &>/dev/null
-cd go/src/github.com/jaracil/nexus/
-
-i glide install
-glide install
+i GO111MODULE=on CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' 
+GO111MODULE=on go build
 if [[ $? != 0 ]]; then
         e Failed
         exit
 fi
 
-i go build
-go build
-if [[ $? != 0 ]]; then
-        e Failed
-        exit
-fi
-popd &>/dev/null
-
-cp go/src/github.com/jaracil/nexus/nexus .
+cd $DIR
+cp $DIR/../nexus .
 
 s Nexus built.
 
