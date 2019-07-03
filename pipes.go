@@ -4,9 +4,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
+	"github.com/sirupsen/logrus"
 	r "gopkg.in/rethinkdb/rethinkdb-go.v5"
 )
 
@@ -36,7 +36,7 @@ func pipeTrack() {
 		if err != nil {
 			Log.WithFields(logrus.Fields{
 				"error": err.Error(),
-			}).Printf("Error opening pipeTrack iterator")
+			}).Errorf("Error opening pipeTrack iterator")
 			time.Sleep(time.Second)
 			continue
 		}
@@ -46,7 +46,7 @@ func pipeTrack() {
 			if !iter.Next(pf) {
 				Log.WithFields(logrus.Fields{
 					"error": iter.Err().Error(),
-				}).Printf("Error processing pipeTrack feed")
+				}).Errorf("Error processing pipeTrack feed")
 				iter.Close()
 				break
 			}
