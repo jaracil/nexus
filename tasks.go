@@ -173,6 +173,9 @@ func taskPull(task *Task) bool {
 			result["prio"] = -newTask.M("prio").IntZ()
 			result["detach"] = newTask.M("detach").BoolZ()
 			result["user"] = newTask.M("user").StringZ()
+			result["ttl"] = newTask.M("ttl").IntZ()
+			result["creationTime"] = newTask.M("creationTime").TimeZ()
+			result["deadLine"] = newTask.M("deadLine").TimeZ()
 			pres, err := r.Table("tasks").
 				Get(task.Id).
 				Update(r.Branch(r.Row.Field("stat").Eq("working"),
