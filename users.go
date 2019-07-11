@@ -375,6 +375,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 				"createdAt":   row.Field("createdAt").Default(time.Time{}),
 			}
 		}).Run(db)
+		defer cur.Close()
 		if err != nil {
 			req.Error(ErrInternal, err.Error(), nil)
 			return
@@ -399,6 +400,7 @@ func (nc *NexusConn) handleUserReq(req *JsonRpcReq) {
 
 		term := getCountTerm("users", "", "id", prefix, filter, countSubprefixes)
 		cur, err := term.Run(db)
+		defer cur.Close()
 		if err != nil {
 			req.Error(ErrInternal, err.Error(), nil)
 			return

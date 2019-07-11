@@ -129,6 +129,8 @@ func nodeTrack() {
 					}
 				}
 			}
+			cur.Close()
+
 			// Check if this is the master node
 			cur, err = r.Table("nodes").Min("id").Run(db)
 			if err == nil {
@@ -153,6 +155,7 @@ func nodeTrack() {
 					}
 				}
 			}
+			cur.Close()
 
 		case <-mainContext.Done():
 			exit = true
@@ -187,7 +190,7 @@ func searchOrphaned(ctx context.Context) {
 				return
 			}
 			tcur.All(&nodes)
-
+			tcur.Close()
 			var nodesregexp string
 			// (^node1|^node2|^node3)
 			if len(nodes) > 0 {
@@ -219,6 +222,7 @@ func searchOrphanedStuff(regex, what, field string) {
 	orphaned, err := r.Table(what).Filter(func(ses r.Term) r.Term {
 		return ses.Field(field).Match(regex).Not()
 	}).Run(db)
+	defer orphaned.Close()
 	if err != nil {
 		Log.WithFields(logrus.Fields{
 			"error": err,
@@ -282,6 +286,7 @@ func searchUncompleted(ctx context.Context) {
 
 func searchUncompletedRenames() {
 	cur, err := r.Table("users").Between("", "\uffff", r.BetweenOpts{Index: "blockedBy"}).Run(db)
+	defer cur.Close()
 	if err != nil {
 		if err != nil {
 			Log.WithFields(logrus.Fields{
@@ -292,7 +297,6 @@ func searchUncompletedRenames() {
 	}
 	uncompleted := make([]interface{}, 0)
 	err = cur.All(&uncompleted)
-	cur.Close()
 
 	switch err {
 	default:
@@ -313,11 +317,11 @@ func searchUncompletedRenames() {
 			renaming := ei.N(u).M("renaming").StringZ()
 			if user != "" && blockedBy != "" {
 				cur, err = r.Table("sessions").Get(blockedBy).Run(db)
+				defer cur.Close()
 				if err != nil {
 					Log.WithFields(logrus.Fields{
 						"error": err,
 					}).Errorf("Error searching uncompleted user rename session for %s", user)
-					cur.Close()
 					continue
 				}
 				if cur.IsNil() {
@@ -327,14 +331,12 @@ func searchUncompletedRenames() {
 						if renaming != "" {
 							_, err = r.Table("users").Get(renaming).Delete().RunWrite(db)
 							if err != nil {
-								cur.Close()
 								continue
 							}
 						}
 						r.Table("users").Get(user).Replace(func(t r.Term) r.Term { return t.Without("blockedBy", "renaming") })
 					}
 				}
-				cur.Close()
 			}
 		}
 	}
@@ -380,6 +382,7 @@ func (nc *NexusConn) handleNodesReq(req *JsonRpcReq) {
 		}
 
 		cur, err := term.Run(db)
+		defer cur.Close()
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return

@@ -108,6 +108,7 @@ func taskTrack() {
 				"error": err.Error(),
 			}).Errorln("Error opening taskTrack iterator")
 			time.Sleep(time.Second)
+			iter.Close()
 			continue
 		}
 		retry = 0 //Reset retrys
@@ -223,6 +224,7 @@ func taskPull(task *Task) bool {
 		Between(ei.S{prefix, "waiting", r.MinVal, r.MinVal}, ei.S{prefix, "waiting", r.MaxVal, r.MaxVal}, r.BetweenOpts{RightBound: "closed", Index: "pspc"}).
 		Limit(1).
 		Run(db, r.RunOpts{Durability: "soft"})
+	defer stuck.Close()
 
 	if !stuck.IsNil() {
 		r.Table("tasks").
@@ -534,6 +536,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 		}
 
 		cur, err := term.Run(db)
+		defer cur.Close()
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
@@ -603,6 +606,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 				})
 			}
 			pushCur, err := pushTerm.Run(db)
+			defer pushCur.Close()
 			if err != nil {
 				req.Error(ErrInternal, err.Error(), nil)
 				return
@@ -613,6 +617,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 				return
 			}
 			pullCur, err := pullTerm.Run(db)
+			defer pullCur.Close()
 			if err != nil {
 				req.Error(ErrInternal, err.Error(), nil)
 				return
@@ -654,6 +659,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			term = term.Count()
 
 			cur, err := term.Run(db)
+			defer cur.Close()
 			if err != nil {
 				req.Error(ErrInternal, err.Error(), nil)
 				return
@@ -675,6 +681,7 @@ func (nc *NexusConn) handleTaskReq(req *JsonRpcReq) {
 			term = term.Count()
 
 			cur, err = term.Run(db)
+			defer cur.Close()
 			if err != nil {
 				req.Error(ErrInternal, err.Error(), nil)
 				return

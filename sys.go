@@ -159,10 +159,10 @@ func loadUserData(user string) (*UserData, int) {
 func loadUserDataWithTemplates(user string, loadedTemplates map[string]bool) (*UserData, int) {
 	ud := &UserData{}
 	cur, err := r.Table("users").Get(strings.ToLower(user)).Run(db)
+	defer cur.Close()
 	if err != nil {
 		return nil, ErrInternal
 	}
-	defer cur.Close()
 	err = cur.One(ud)
 	if err != nil {
 		if err == r.ErrEmptyResult {

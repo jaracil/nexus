@@ -74,6 +74,7 @@ func (nc *NexusConn) handleSyncReq(req *JsonRpcReq) {
 			Pluck("id", "owner")
 
 		cur, err := term.Run(db)
+		defer cur.Close()
 		if err != nil {
 			req.Error(ErrInternal, err.Error(), nil)
 			return
@@ -98,6 +99,7 @@ func (nc *NexusConn) handleSyncReq(req *JsonRpcReq) {
 
 		term := getCountTerm("locks", "", "id", prefix, filter, countSubprefixes)
 		cur, err := term.Run(db)
+		defer cur.Close()
 		if err != nil {
 			req.Error(ErrInternal, err.Error(), nil)
 			return

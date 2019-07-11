@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
+	"github.com/sirupsen/logrus"
 	r "gopkg.in/rethinkdb/rethinkdb-go.v5"
 )
 
@@ -89,6 +89,7 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 					"sessions": row.Field("reduction"),
 					"n":        row.Field("reduction").Count()}
 			}).Run(db)
+		defer cur.Close()
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return
@@ -143,6 +144,7 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 		}
 
 		cur, err := term.Run(db)
+		defer cur.Close()
 		if err != nil {
 			req.Error(ErrInternal, err.Error(), nil)
 			return
@@ -175,6 +177,7 @@ func (nc *NexusConn) handleSessionReq(req *JsonRpcReq) {
 			Between(prefix, prefix+"\uffff").
 			Pluck("user").
 			Run(db)
+		defer connuser.Close()
 		if err != nil {
 			req.Error(ErrInternal, "", nil)
 			return

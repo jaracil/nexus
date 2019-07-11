@@ -177,6 +177,7 @@ func (nc *NexusConn) handleTopicReq(req *JsonRpcReq) {
 		}
 
 		cur, err := term.Run(db, r.RunOpts{})
+		defer cur.Close()
 		if err != nil {
 			req.Error(ErrInternal, err.Error(), nil)
 			return
@@ -239,6 +240,7 @@ func (nc *NexusConn) handleTopicReq(req *JsonRpcReq) {
 		}
 
 		cur, err := term.Run(db)
+		defer cur.Close()
 		if err != nil {
 			req.Error(ErrInternal, err.Error(), nil)
 			return
