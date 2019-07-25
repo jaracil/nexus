@@ -7,18 +7,18 @@ import (
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
 	"github.com/sirupsen/logrus"
-	r "gopkg.in/rethinkdb/rethinkdb-go.v5"
+	r "gopkg.in/rethinkdb/rethinkdb-go.v3"
 )
 
 type Session struct {
-	Id     string `rethinkdb:"id"`
-	Kick   bool   `rethinkdb:"kick"`
-	Reload bool   `rethinkdb:"reload"`
+	Id     string `gorethink:"id"`
+	Kick   bool   `gorethink:"kick"`
+	Reload bool   `gorethink:"reload"`
 }
 
 type SessionFeed struct {
-	Old *Session `rethinkdb:"old_val"`
-	New *Session `rethinkdb:"new_val"`
+	Old *Session `gorethink:"old_val"`
+	New *Session `gorethink:"new_val"`
 }
 
 func sessionTrack() {

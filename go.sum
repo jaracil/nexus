@@ -81,5 +81,7 @@ gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 h1:qIbj1fsPNlZgppZ+VLlY7N33
 gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/fatih/pool.v2 v2.0.0 h1:xIFeWtxifuQJGk/IEPKsTduEKcKvPmhoiVDGpC40nKg=
 gopkg.in/fatih/pool.v2 v2.0.0/go.mod h1:8xVGeu1/2jr2wm5V9SPuMht2H5AEmf5aFMGSQixtjTY=
-gopkg.in/rethinkdb/rethinkdb-go.v5 v5.0.1 h1:cBTUuUFTllRYtInK6FtBRa+tOBlZqpeDTnZF54xjGbg=
-gopkg.in/rethinkdb/rethinkdb-go.v5 v5.0.1/go.mod h1:x+1XKi70FH0kHCpvPQ78hGBCCxoNdE7sP+kEFdKgN6A=
+gopkg.in/gorethink/gorethink.v3 v3.0.5 h1:e2Uc/Xe+hpcVQFsj6MuHlYog3r0JYpnTzwDj/y2O4MU=
+gopkg.in/gorethink/gorethink.v3 v3.0.5/go.mod h1:+3yIIHJUGMBK+wyPH+iN5TP+88ikFDfZdqTlK3Y9q8I=
+gopkg.in/rethinkdb/rethinkdb-go.v3 v3.0.5 h1:DOhWlZgAlNaHfo241QywAl/1dtYjmD90M8ftBA5ix8A=
+gopkg.in/rethinkdb/rethinkdb-go.v3 v3.0.5/go.mod h1:Oivth8QoCqxIBXiq+83MPjlchtoKGFP592Ib8Gu1uRE=

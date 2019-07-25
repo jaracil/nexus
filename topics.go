@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/jaracil/ei"
-	r "gopkg.in/rethinkdb/rethinkdb-go.v5"
+	r "gopkg.in/rethinkdb/rethinkdb-go.v3"
 )
 
 func topicList(s string) (res []interface{}) {

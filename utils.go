@@ -13,7 +13,7 @@ import (
 	"github.com/jaracil/ei"
 
 	"golang.org/x/crypto/scrypt"
-	r "gopkg.in/rethinkdb/rethinkdb-go.v5"
+	r "gopkg.in/rethinkdb/rethinkdb-go.v3"
 )
 
 func inStrSlice(slice []string, str string) bool {

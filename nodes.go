@@ -10,7 +10,7 @@ import (
 	. "github.com/jaracil/nexus/log"
 	"github.com/shirou/gopsutil/load"
 	"github.com/sirupsen/logrus"
-	r "gopkg.in/rethinkdb/rethinkdb-go.v5"
+	r "gopkg.in/rethinkdb/rethinkdb-go.v3"
 )
 
 var masterNode = int32(0)

@@ -11,6 +11,7 @@ require (
 	github.com/go-ole/go-ole v1.2.4 // indirect
 	github.com/golang/protobuf v1.3.1 // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20190430165422-3e4dfb77656c // indirect
+	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
 	github.com/jaracil/ei v0.0.0-20170808175009-4f519a480ebd
 	github.com/jaracil/smartio v0.0.0-20160606092121-a059462b5df8
 	github.com/jaracil/websocket v0.0.0-20160616160344-648d4bd55c0a // indirect
@@ -26,5 +27,7 @@ require (
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7
 	golang.org/x/sys v0.0.0-20190626221950-04f50cda93cb // indirect
 	golang.org/x/text v0.3.2 // indirect
-	gopkg.in/rethinkdb/rethinkdb-go.v5 v5.0.1
+	gopkg.in/fatih/pool.v2 v2.0.0 // indirect
+	gopkg.in/gorethink/gorethink.v3 v3.0.5 // indirect
+	gopkg.in/rethinkdb/rethinkdb-go.v3 v3.0.5
 )

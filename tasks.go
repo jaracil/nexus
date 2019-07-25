@@ -8,34 +8,34 @@ import (
 	"github.com/jaracil/ei"
 	. "github.com/jaracil/nexus/log"
 	"github.com/sirupsen/logrus"
-	r "gopkg.in/rethinkdb/rethinkdb-go.v5"
+	r "gopkg.in/rethinkdb/rethinkdb-go.v3"
 )
 
 type Task struct {
-	Id           string      `rethinkdb:"id" json:"id"`
-	Stat         string      `rethinkdb:"stat" json:"state""`
-	Path         string      `rethinkdb:"path" json:"path"`
-	Prio         int         `rethinkdb:"prio" json:"priority"`
-	Ttl          int         `rethinkdb:"ttl" json:"ttl"`
-	Detach       bool        `rethinkdb:"detach" json:"detached"`
-	User         string      `rethinkdb:"user" json:"user"`
-	Method       string      `rethinkdb:"method" json:"method"`
-	Params       interface{} `rethinkdb:"params" json:"params"`
-	LocalId      interface{} `rethinkdb:"localId" json:"-"`
-	Tses         string      `rethinkdb:"tses" json:"targetSession"`
-	Result       interface{} `rethinkdb:"result,omitempty" json:"result"`
-	ErrCode      *int        `rethinkdb:"errCode,omitempty" json:"errCode"`
-	ErrStr       string      `rethinkdb:"errStr,omitempty" json:"errString"`
-	ErrObj       interface{} `rethinkdb:"errObj,omitempty" json:"errObject"`
-	Tags         interface{} `rethinkdb:"tags,omitempty" json:"tags"`
-	CreationTime interface{} `rethinkdb:"creationTime,omitempty" json:"creationTime"`
-	WorkingTime  interface{} `rethinkdb:"workingTime,omitempty" json:"workingTime"`
-	DeadLine     interface{} `rethinkdb:"deadLine,omitempty" json:"deadline"`
+	Id           string      `gorethink:"id" json:"id"`
+	Stat         string      `gorethink:"stat" json:"state""`
+	Path         string      `gorethink:"path" json:"path"`
+	Prio         int         `gorethink:"prio" json:"priority"`
+	Ttl          int         `gorethink:"ttl" json:"ttl"`
+	Detach       bool        `gorethink:"detach" json:"detached"`
+	User         string      `gorethink:"user" json:"user"`
+	Method       string      `gorethink:"method" json:"method"`
+	Params       interface{} `gorethink:"params" json:"params"`
+	LocalId      interface{} `gorethink:"localId" json:"-"`
+	Tses         string      `gorethink:"tses" json:"targetSession"`
+	Result       interface{} `gorethink:"result,omitempty" json:"result"`
+	ErrCode      *int        `gorethink:"errCode,omitempty" json:"errCode"`
+	ErrStr       string      `gorethink:"errStr,omitempty" json:"errString"`
+	ErrObj       interface{} `gorethink:"errObj,omitempty" json:"errObject"`
+	Tags         interface{} `gorethink:"tags,omitempty" json:"tags"`
+	CreationTime interface{} `gorethink:"creationTime,omitempty" json:"creationTime"`
+	WorkingTime  interface{} `gorethink:"workingTime,omitempty" json:"workingTime"`
+	DeadLine     interface{} `gorethink:"deadLine,omitempty" json:"deadline"`
 }
 
 type TaskFeed struct {
-	Old *Task `rethinkdb:"old_val"`
-	New *Task `rethinkdb:"new_val"`
+	Old *Task `gorethink:"old_val"`
+	New *Task `gorethink:"new_val"`
 }
 
 func taskPurge() {
