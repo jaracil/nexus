@@ -73,6 +73,19 @@ func NewNexusConn(conn net.Conn) *NexusConn {
 		log:    Log,
 	}
 	nc.context, nc.cancelFun = context.WithCancel(mainContext)
+
+	// TODO - Needs a proper fix
+	// This is a crude rate limiter for new connections. Due to every client doing
+	// a sys.login almost immediately after connecting, a low-latency client which gets stuck
+	// creating new connections will not give time to the GC to mark as free the memory used
+	// by the sys.login "scrypt.Key" derivation function, so instead of reusing the chunk
+	// it just grows the heap bigger, causing a hundred connections to eat more than 2GiB of ram
+	// which will be freed after quite a while, since the GC must mark them free first, and
+	// even then the scavenger will might take some time before madvise-ing the kernel that
+	// those pages are unused. Note that the RSS numbers will be kept high until the machine
+	// has some memory pressure and the kernel finally reclaims those pages.
+	time.Sleep(time.Millisecond * 100)
+
 	return nc
 }
 
