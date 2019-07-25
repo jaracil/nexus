@@ -49,6 +49,9 @@ func sessionTrack() {
 				break
 			}
 			if sf.New == nil { // session closed
+				if sf.Old == nil { // there is no sessions
+					continue
+				}
 				sesNotify.Unregister(sf.Old.Id)
 				continue
 			}
