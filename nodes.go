@@ -183,6 +183,7 @@ func searchOrphaned(ctx context.Context) {
 			t = time.After(time.Minute)
 			nodes := make([]map[string]interface{}, 0)
 			tcur, err := r.Table("nodes").Pluck("id").Run(db)
+			defer tcur.Close()
 			if err != nil {
 				Log.WithFields(logrus.Fields{
 					"error": err,
@@ -190,7 +191,6 @@ func searchOrphaned(ctx context.Context) {
 				return
 			}
 			tcur.All(&nodes)
-			tcur.Close()
 			var nodesregexp string
 			// (^node1|^node2|^node3)
 			if len(nodes) > 0 {
