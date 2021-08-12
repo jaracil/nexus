@@ -66,8 +66,19 @@ func (*httpwsHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		}
 
 	} else {
-
 		// HTTP Bridge
+		// CORS pre-flight headers
+		res.Header().Set("Access-Control-Allow-Origin", "*")
+		res.Header().Set("Access-Control-Allow-Methods", "POST, GET")
+		res.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, Authorization")
+
+		switch req.Method {
+		case "POST", "GET":
+			// continue
+		default:
+			return
+		}
+
 		netCli, netSrv := net.Pipe()
 		netCliBuf := bufio.NewReaderSize(netCli, opts.MaxMessageSize)
 		ns := NewNexusConn(netSrv)
