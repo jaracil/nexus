@@ -30,10 +30,12 @@ func setMasterNode(master bool) {
 func nodeTrack() {
 	defer exit("node tracker exit")
 
+	var deadlineOffset int = 30
+
 	// Insert node in node-tracking table
 	ndata := ei.M{
 		"id":       nodeId,
-		"deadline": r.Now().Add(10),
+		"deadline": r.Now().Add(deadlineOffset),
 		"kill":     false,
 		"version":  Version.String(),
 	}
@@ -58,7 +60,7 @@ func nodeTrack() {
 		select {
 		case <-tick.C:
 			info := ei.M{
-				"deadline":  r.Now().Add(10),
+				"deadline":  r.Now().Add(deadlineOffset),
 				"clients":   numconn,
 				"listening": listenContext.Err() == nil,
 			}
@@ -111,9 +113,9 @@ func nodeTrack() {
 					}).Printf("Killing node")
 				}
 			}
-			// Clean killed nodes after 10 seconds.
+			// Clean killed nodes after deadlineOffset seconds.
 			cur, err := r.Table("nodes").
-				Filter(r.Row.Field("deadline").Lt(r.Now().Add(-10))).
+				Filter(r.Row.Field("deadline").Lt(r.Now().Add(-deadlineOffset))).
 				Filter(r.Row.Field("kill").Eq(true)).
 				Run(db)
 			if err == nil {
